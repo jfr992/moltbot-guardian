@@ -1219,46 +1219,73 @@ if __name__ == '__main__':
         gateway_client = get_gateway_client()
 
         # Register callbacks to process real-time events
-        def on_tool_call(data):
-            """Handle incoming tool calls from gateway."""
-            print(f"[Gateway] Tool call: {data.get('tool', 'unknown')}")
-            # Emit to dashboard UI
-            socketio.emit('tool_call', data)
-            # Run security analysis on exec commands
-            if data.get('tool') == 'exec':
-                command = data.get('args', {}).get('command', '')
-                intel = get_threat_intel()
-                threats = intel.analyze_command(command)
-                if threats:
-                    alert = {
-                        'title': f"🚨 Suspicious command detected",
-                        'severity': 'high',
-                        'description': f"Gateway detected: {command[:100]}",
-                        'timestamp': datetime.now().isoformat(),
-                        'category': 'gateway_threat_intel',
-                        'details': {
-                            'command': command,
-                            'threats': threats,
-                            'source': 'gateway_realtime'
-                        }
-                    }
-                    SECURITY_STATE['alerts'].insert(0, alert)
-                    socketio.emit('security_alert', alert)
+        def on_agent_event(data):
+            """Handle agent events (tool calls, lifecycle) from gateway."""
+            stream = data.get('stream', '')
+            event_data = data.get('data', {})
+            
+            # Tool call events
+            if stream == 'tool_call' or 'tool' in event_data:
+                tool_name = event_data.get('tool', event_data.get('name', 'unknown'))
+                print(f"[Gateway] 🔧 Tool call: {tool_name}")
+                socketio.emit('tool_call', data)
+                record_tool_call(tool_name, True)
+                
+                # Security analysis on exec
+                if tool_name == 'exec':
+                    command = event_data.get('args', {}).get('command', '')
+                    if command:
+                        intel = get_threat_intel()
+                        threats = intel.analyze_command(command)
+                        if threats:
+                            alert = {
+                                'title': f"🚨 Suspicious command detected",
+                                'severity': 'high',
+                                'description': f"Real-time: {command[:100]}",
+                                'timestamp': datetime.now().isoformat(),
+                                'category': 'gateway_threat_intel',
+                                'details': {
+                                    'command': command,
+                                    'threats': threats,
+                                    'source': 'gateway_realtime'
+                                }
+                            }
+                            SECURITY_STATE['alerts'].insert(0, alert)
+                            socketio.emit('security_alert', alert)
+            
+            # Lifecycle events
+            elif stream in ('start', 'complete', 'error', 'aborted'):
+                socketio.emit('agent_lifecycle', data)
 
-        def on_message(data):
-            """Handle incoming messages from gateway."""
-            socketio.emit('agent_message', data)
+        def on_chat_event(data):
+            """Handle chat/message events from gateway."""
+            socketio.emit('chat_event', data)
+            
+            # Record token usage if present
+            usage = data.get('usage', {})
+            if usage:
+                input_tokens = usage.get('inputTokens', 0)
+                output_tokens = usage.get('outputTokens', 0)
+                if input_tokens or output_tokens:
+                    record_tokens(input_tokens, output_tokens, 'unknown')
 
-        def on_session(data):
-            """Handle session events from gateway."""
-            socketio.emit('session_event', data)
+        def on_presence_event(data):
+            """Handle presence updates from gateway."""
+            socketio.emit('presence', data)
 
-        gateway_client.on('tool_call', on_tool_call)
-        gateway_client.on('message', on_message)
-        gateway_client.on('session', on_session)
+        def on_connect(data):
+            """Handle gateway connection state."""
+            print(f"[Gateway] Connection state: {data}")
+            socketio.emit('gateway_status', data)
+
+        # Subscribe to events
+        gateway_client.on('agent', on_agent_event)
+        gateway_client.on('chat', on_chat_event)
+        gateway_client.on('presence', on_presence_event)
+        gateway_client.on('connect', on_connect)
 
         gateway_client.start_background()
-        print("🔗 Gateway connection: attempting...")
+        print("🔗 Gateway connection: starting background thread...")
     except Exception as e:
         print(f"⚠️  Gateway connection skipped: {e}")
 

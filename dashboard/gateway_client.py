@@ -1,37 +1,43 @@
 """
 Gateway WebSocket Client - Real-time connection to Clawdbot gateway.
-Uses raw WebSocket with challenge-response auth (like crabwalk).
+Receives chat/agent events for live monitoring.
 """
 import os
 import json
-import hmac
-import hashlib
 import threading
 import time
 from pathlib import Path
-from typing import Callable, Optional, Dict, Any
+from typing import Callable, Optional, Dict, Any, List
 import websocket
 
 CLAWDBOT_CONFIG = Path.home() / '.clawdbot' / 'clawdbot.json'
 
 
-def create_connect_params(token: str, nonce: str, ts: int) -> Dict[str, Any]:
-    """Create signed connection params for challenge-response auth."""
-    message = f"{nonce}:{ts}"
-    signature = hmac.new(
-        token.encode('utf-8'),
-        message.encode('utf-8'),
-        hashlib.sha256
-    ).hexdigest()
+def create_connect_params(token: Optional[str] = None) -> Dict[str, Any]:
+    """Create connection params for gateway handshake."""
     return {
-        "nonce": nonce,
-        "ts": ts,
-        "sig": signature,
+        "minProtocol": 3,
+        "maxProtocol": 3,
+        "client": {
+            "id": "moltbot-guardian",
+            "displayName": "MoltBot Guardian",
+            "version": "1.0.0",
+            "platform": "linux",
+            "mode": "cli",
+        },
+        "role": "operator",
+        "scopes": ["operator.read"],
+        "caps": [],
+        "commands": [],
+        "permissions": {},
+        "locale": "en-US",
+        "userAgent": "moltbot-guardian/1.0.0",
+        "auth": {"token": token} if token else None,
     }
 
 
 class GatewayClient:
-    """WebSocket client for Clawdbot gateway with challenge-response auth."""
+    """WebSocket client for Clawdbot gateway - receives real-time events."""
 
     def __init__(self):
         self.ws: Optional[websocket.WebSocketApp] = None
@@ -39,15 +45,17 @@ class GatewayClient:
         self._load_config()
         self.request_id = 0
         self.pending_requests: Dict[str, Any] = {}
-        self.callbacks: Dict[str, list] = {
-            'tool_call': [],
-            'message': [],
-            'session': [],
-            'error': [],
-            'connect': [],
+        self.callbacks: Dict[str, List[Callable]] = {
+            'chat': [],       # Chat/message events
+            'agent': [],      # Agent tool call events  
+            'presence': [],   # Presence updates
+            'health': [],     # Health events
+            'connect': [],    # Connection state
+            'error': [],      # Errors
         }
         self._thread: Optional[threading.Thread] = None
         self._stop = False
+        self._features: Dict[str, Any] = {}
 
     def _load_config(self):
         """Load gateway URL and token from clawdbot config."""
@@ -55,21 +63,23 @@ class GatewayClient:
         self.token = os.environ.get('CLAWDBOT_API_TOKEN')
         
         # Auto-load from clawdbot.json if not set
-        if not self.token and CLAWDBOT_CONFIG.exists():
+        if CLAWDBOT_CONFIG.exists():
             try:
                 config = json.loads(CLAWDBOT_CONFIG.read_text())
-                self.token = config.get('gateway', {}).get('auth', {}).get('token')
-                # Also get port if configured
+                if not self.token:
+                    self.token = config.get('gateway', {}).get('auth', {}).get('token')
+                # Get port if configured
                 port = config.get('gateway', {}).get('port', 18789)
                 if 'CLAWDBOT_URL' not in os.environ:
                     self.gateway_url = f'ws://127.0.0.1:{port}'
             except Exception as e:
-                print(f"[GatewayClient] Failed to load config: {e}")
+                print(f"[GatewayClient] Config load warning: {e}")
 
     def on(self, event: str, callback: Callable):
         """Register a callback for an event type."""
         if event in self.callbacks:
             self.callbacks[event].append(callback)
+        return self  # Allow chaining
 
     def _emit(self, event: str, data: Any):
         """Emit event to all registered callbacks."""
@@ -77,7 +87,7 @@ class GatewayClient:
             try:
                 cb(data)
             except Exception as e:
-                print(f"[GatewayClient] Callback error: {e}")
+                print(f"[GatewayClient] Callback error ({event}): {e}")
 
     def _on_message(self, ws, message: str):
         """Handle incoming WebSocket message."""
@@ -85,74 +95,79 @@ class GatewayClient:
             msg = json.loads(message)
             msg_type = msg.get('type')
 
-            # Handle challenge-response auth
+            # Handle challenge - send connect request
             if msg_type == 'event' and msg.get('event') == 'connect.challenge':
-                self._handle_challenge(msg.get('payload', {}))
+                self._send_connect()
                 return
 
-            # Handle hello-ok (connected)
-            if msg_type == 'hello-ok' or (msg_type == 'res' and msg.get('ok') and 
-                                          isinstance(msg.get('payload'), dict) and 
-                                          msg['payload'].get('type') == 'hello-ok'):
-                self.connected = True
-                print(f"[GatewayClient] Connected to {self.gateway_url}")
-                self._emit('connect', {'connected': True})
-                return
-
-            # Handle response to our requests
+            # Handle connect response (hello-ok)
             if msg_type == 'res':
+                payload = msg.get('payload', {})
+                if payload.get('type') == 'hello-ok':
+                    self.connected = True
+                    self._features = payload.get('features', {})
+                    print(f"[GatewayClient] ✅ Connected to {self.gateway_url}")
+                    print(f"[GatewayClient] Events available: {self._features.get('events', [])}")
+                    self._emit('connect', {'connected': True, 'features': self._features})
+                    return
+                
+                # Handle other responses
                 req_id = msg.get('id')
                 if req_id in self.pending_requests:
                     pending = self.pending_requests.pop(req_id)
                     if msg.get('ok'):
-                        pending['resolve'](msg.get('payload'))
+                        pending['resolve'](payload)
                     else:
                         pending['reject'](msg.get('error', {}).get('message', 'Request failed'))
                 return
 
-            # Handle events from gateway
+            # Handle events (chat, agent, presence, health, tick)
             if msg_type == 'event':
                 event_name = msg.get('event', '')
                 payload = msg.get('payload', {})
-
-                # Map to our callback types
-                if 'tool' in event_name.lower() or payload.get('tool'):
-                    self._emit('tool_call', payload)
-                elif 'message' in event_name.lower() or 'chat' in event_name.lower():
-                    self._emit('message', payload)
-                elif 'session' in event_name.lower():
-                    self._emit('session', payload)
+                
+                # Route to appropriate callbacks
+                if event_name == 'chat':
+                    self._emit('chat', payload)
+                elif event_name == 'agent':
+                    self._emit('agent', payload)
+                elif event_name == 'presence':
+                    self._emit('presence', payload)
+                elif event_name == 'health':
+                    self._emit('health', payload)
+                elif event_name == 'tick':
+                    pass  # Heartbeat, ignore
+                else:
+                    # Unknown event - log it
+                    print(f"[GatewayClient] Unknown event: {event_name}")
 
         except json.JSONDecodeError:
             print(f"[GatewayClient] Invalid JSON: {message[:100]}")
         except Exception as e:
             print(f"[GatewayClient] Message error: {e}")
 
-    def _handle_challenge(self, challenge: Dict[str, Any]):
-        """Respond to auth challenge."""
-        if not self.token or not self.ws:
-            print("[GatewayClient] No token for auth challenge")
+    def _send_connect(self):
+        """Send connect request after challenge."""
+        if not self.ws:
             return
 
-        nonce = challenge.get('nonce', '')
-        ts = challenge.get('ts', int(time.time() * 1000))
-
-        params = create_connect_params(self.token, nonce, ts)
-        response = {
+        req_id = f"connect-{int(time.time() * 1000)}"
+        request = {
             "type": "req",
-            "id": f"connect-{int(time.time() * 1000)}",
+            "id": req_id,
             "method": "connect",
-            "params": params,
+            "params": create_connect_params(self.token),
         }
 
         try:
-            self.ws.send(json.dumps(response))
+            self.ws.send(json.dumps(request))
+            print("[GatewayClient] 🔑 Sent connect request...")
         except Exception as e:
-            print(f"[GatewayClient] Failed to send auth response: {e}")
+            print(f"[GatewayClient] Failed to send connect: {e}")
 
     def _on_error(self, ws, error):
         """Handle WebSocket error."""
-        print(f"[GatewayClient] Error: {error}")
+        print(f"[GatewayClient] ❌ Error: {error}")
         self._emit('error', {'type': 'websocket_error', 'error': str(error)})
 
     def _on_close(self, ws, close_status_code, close_msg):
@@ -164,8 +179,8 @@ class GatewayClient:
             self._emit('error', {'type': 'disconnected', 'code': close_status_code})
 
     def _on_open(self, ws):
-        """Handle WebSocket open."""
-        print(f"[GatewayClient] WebSocket opened, waiting for challenge...")
+        """Handle WebSocket open - wait for challenge."""
+        print(f"[GatewayClient] 🔌 WebSocket opened, waiting for challenge...")
 
     def connect(self) -> bool:
         """Connect to gateway WebSocket."""
@@ -197,19 +212,26 @@ class GatewayClient:
         """Start connection in background thread with auto-reconnect."""
         def run():
             while not self._stop:
-                if not self.connected and self.ws:
-                    try:
-                        self.ws.run_forever(ping_interval=30, ping_timeout=10)
-                    except Exception as e:
-                        print(f"[GatewayClient] Run error: {e}")
+                if not self.connected:
+                    self.connect()
+                    if self.ws:
+                        try:
+                            # run_forever blocks until disconnected
+                            self.ws.run_forever(
+                                ping_interval=30,
+                                ping_timeout=10,
+                                skip_utf8_validation=True
+                            )
+                        except Exception as e:
+                            print(f"[GatewayClient] Run error: {e}")
                 
                 if not self._stop:
+                    print("[GatewayClient] Reconnecting in 5s...")
                     time.sleep(5)
-                    self.connect()  # Reconnect
 
-        self.connect()
         self._thread = threading.Thread(target=run, daemon=True)
         self._thread.start()
+        print("[GatewayClient] 🚀 Background thread started")
 
     def request(self, method: str, params: Any = None, timeout: float = 30.0) -> Any:
         """Send a request and wait for response."""
@@ -266,6 +288,7 @@ class GatewayClient:
             'has_token': bool(self.token),
             'token_source': 'env' if os.environ.get('CLAWDBOT_API_TOKEN') else 
                            ('config' if self.token else 'none'),
+            'features': self._features,
         }
 
 

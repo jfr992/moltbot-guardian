@@ -109,6 +109,66 @@ curl -X POST http://localhost:5050/api/baseline/config \
 
 ---
 
+## OpenTelemetry Integration
+
+MoltBot Guardian can receive telemetry directly from Clawdbot! Add this to `~/.clawdbot/clawdbot.json`:
+
+```json
+{
+  "plugins": {
+    "allow": ["diagnostics-otel"],
+    "entries": {
+      "diagnostics-otel": { "enabled": true }
+    }
+  },
+  "diagnostics": {
+    "enabled": true,
+    "otel": {
+      "enabled": true,
+      "endpoint": "http://localhost:4318",
+      "traces": true,
+      "metrics": true,
+      "logs": false
+    }
+  }
+}
+```
+
+Then run with the observability stack:
+
+```bash
+docker-compose up -d
+```
+
+**Dashboards:**
+- http://localhost:3000 — Grafana (admin/moltbot)
+- http://localhost:16686 — Jaeger traces
+- http://localhost:9090 — Prometheus
+
+**Metrics from Clawdbot:**
+- `clawdbot.tokens` — Token usage by model/channel
+- `clawdbot.cost.usd` — API costs
+- `clawdbot.run.duration_ms` — Run times
+- `clawdbot.webhook.received` — Webhook traffic
+- `clawdbot.message.processed` — Message throughput
+
+---
+
+## Real-time Gateway Events
+
+MoltBot connects to Clawdbot's gateway WebSocket for live monitoring:
+
+```
+✅ Tool calls as they happen
+✅ Chat/message events
+✅ Session state changes
+✅ Presence updates
+```
+
+Auto-configures from `~/.clawdbot/clawdbot.json` (reads `gateway.auth.token` and `gateway.port`).
+
+---
+
 ## Security
 
 Runs **locally only** — no data leaves your machine.
