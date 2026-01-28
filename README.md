@@ -4,8 +4,8 @@
 
 **Real-time security dashboard for AI agent operations**
 
-[![CI](https://github.com/jfr992/moltbot-security-dashboard/actions/workflows/ci.yml/badge.svg)](https://github.com/jfr992/moltbot-security-dashboard/actions/workflows/ci.yml)
-[![Docker](https://img.shields.io/badge/docker-ghcr.io-blue.svg)](https://github.com/jfr992/moltbot-security-dashboard/pkgs/container/moltbot-guardian)
+[![CI](https://github.com/jfr992/moltbot-guardian/actions/workflows/ci.yml/badge.svg)](https://github.com/jfr992/moltbot-guardian/actions/workflows/ci.yml)
+[![Docker](https://img.shields.io/badge/docker-ghcr.io-blue.svg)](https://github.com/jfr992/moltbot-guardian/pkgs/container/moltbot-guardian)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
 </div>
@@ -70,8 +70,8 @@ docker run -d --name moltbot-guardian \
 
 ```bash
 # Clone the repo
-git clone https://github.com/jfr992/moltbot-security-dashboard.git
-cd moltbot-security-dashboard
+git clone https://github.com/jfr992/moltbot-guardian.git
+cd moltbot-guardian
 
 # Start with your Clawdbot token
 CLAWDBOT_API_TOKEN=$(jq -r '.gateway.auth.token' ~/.clawdbot/clawdbot.json) \

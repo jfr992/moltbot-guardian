@@ -5,7 +5,7 @@
 services:
   guardian:
     build: .
-    image: moltbot-security-dashboard-guardian:latest
+    image: moltbot-guardian:latest
     container_name: moltbot-guardian
     network_mode: host
     volumes:
