@@ -1172,7 +1172,36 @@ def api_usage():
 
     return jsonify(usage)
 
+def run_auto_purge():
+    """Run auto-purge if enabled in settings."""
+    settings = get_settings()
+    if not settings.get('autoPurge', False):
+        return
+
+    retention_days = settings.get('retentionDays', 30)
+    if retention_days == 0:
+        return
+
+    cutoff = datetime.now() - timedelta(days=retention_days)
+    deleted = 0
+
+    for jsonl in SESSIONS_DIR.rglob('*.jsonl'):
+        try:
+            mtime = datetime.fromtimestamp(jsonl.stat().st_mtime)
+            if mtime < cutoff:
+                jsonl.unlink()
+                deleted += 1
+        except:
+            pass
+
+    if deleted > 0:
+        print(f"🧹 Auto-purge: deleted {deleted} old session files")
+
+
 if __name__ == '__main__':
+    # Run auto-purge on startup
+    run_auto_purge()
+
     # Start background threads
     monitor_thread = threading.Thread(target=background_monitor, daemon=True)
     monitor_thread.start()

@@ -1,4 +1,4 @@
-import { LayoutDashboard, Bell, Globe, Folder, Settings, Shield } from 'lucide-react'
+import { LayoutDashboard, Bell, Globe, Folder, Settings, Shield, Lock } from 'lucide-react'
 
 const navItems = [
   { id: 'all', icon: LayoutDashboard, label: 'Dashboard' },
@@ -50,7 +50,7 @@ function CrabShieldLogo({ alert }) {
   )
 }
 
-export default function Sidebar({ activeView, onViewChange, onOpenSettings }) {
+export default function Sidebar({ activeView, onViewChange, onOpenSettings, onOpenPrivacy }) {
   return (
     <aside className="fixed left-0 top-0 h-full w-16 bg-shell-900 border-r border-shell-700 flex flex-col items-center py-4 z-50">
       {/* Logo */}
@@ -81,6 +81,15 @@ export default function Sidebar({ activeView, onViewChange, onOpenSettings }) {
 
       {/* Divider */}
       <div className="w-8 h-px bg-shell-700 my-4" />
+
+      {/* Local Only Indicator */}
+      <button
+        onClick={onOpenPrivacy}
+        className="w-11 h-11 rounded-lg text-neon-cyan hover:bg-shell-800 flex items-center justify-center transition-all mb-2"
+        title="Local Only - Click for data flow info"
+      >
+        <Lock className="w-5 h-5" />
+      </button>
 
       {/* Settings */}
       <button

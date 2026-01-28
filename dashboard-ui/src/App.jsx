@@ -57,10 +57,11 @@ export default function App() {
         activeView={activeView}
         onViewChange={setActiveView}
         onOpenSettings={() => setSettingsOpen(true)}
+        onOpenPrivacy={() => setPrivacyOpen(true)}
       />
 
       <main className="ml-16 p-4">
-        <Header onOpenPrivacy={() => setPrivacyOpen(true)} />
+        <Header />
 
         {/* Metrics - always visible but compact when zoomed */}
         <div className={`transition-all duration-300 ${isZoomed ? 'mb-3' : 'mb-4'}`}>

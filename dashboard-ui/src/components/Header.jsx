@@ -1,4 +1,4 @@
-import { Shield, Brain, Lock, Activity, DollarSign } from 'lucide-react'
+import { Shield, Brain, Activity, DollarSign } from 'lucide-react'
 import { useState, useEffect } from 'react'
 import { io } from 'socket.io-client'
 
@@ -11,7 +11,7 @@ function formatTimeAgo(timestamp) {
   return 'over 1h ago'
 }
 
-export default function Header({ onOpenPrivacy }) {
+export default function Header() {
   const [time, setTime] = useState(new Date())
   const [baseline, setBaseline] = useState(null)
   const [securityStatus, setSecurityStatus] = useState({ status: 'ok', alert_count: 0 })
@@ -124,16 +124,6 @@ export default function Header({ onOpenPrivacy }) {
             </span>
           </div>
         )}
-
-        {/* Privacy Indicator */}
-        <button
-          onClick={onOpenPrivacy}
-          className="flex items-center gap-2 px-3 py-2 rounded-lg bg-shell-800 border border-shell-600 hover:border-neon-cyan/50 hover:bg-shell-700 transition-all"
-          title="Click for data flow info"
-        >
-          <Lock className="w-4 h-4 text-neon-cyan" />
-          <span className="text-xs font-mono text-shell-500">LOCAL ONLY</span>
-        </button>
 
         {/* Security Status */}
         <div className={`flex items-center gap-2 px-3 py-2 rounded-lg border transition-all ${
