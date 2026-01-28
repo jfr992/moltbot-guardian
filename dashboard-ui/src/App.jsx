@@ -5,6 +5,7 @@ import MetricCards from './components/MetricCards'
 import ActivityLog from './components/ActivityLog'
 import AlertsPanel from './components/AlertsPanel'
 import NetworkPanel from './components/NetworkPanel'
+import TrustPanel from './components/TrustPanel'
 import SettingsModal from './components/SettingsModal'
 import PrivacyModal from './components/PrivacyModal'
 import { useActivity, useAlerts } from './hooks/useApi'
@@ -60,6 +61,12 @@ export default function App() {
             {activeView === 'files' && (
               <div className="bg-[var(--dark-800)] rounded-xl border border-blue-500/30 overflow-hidden shadow-lg shadow-blue-500/10">
                 <ExpandedFileOps operations={data?.file_ops} />
+              </div>
+            )}
+
+            {activeView === 'trust' && (
+              <div className="bg-[var(--dark-800)] rounded-xl border border-purple-500/30 overflow-hidden shadow-lg shadow-purple-500/10">
+                <TrustPanel expanded={true} />
               </div>
             )}
           </div>

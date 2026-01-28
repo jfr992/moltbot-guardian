@@ -15,11 +15,13 @@ from flask_socketio import SocketIO
 import threading
 import time
 
-# Import security detector
+# Import security detector and trust engine
 from detector import SecurityDetector
+from trust import get_trust_engine, TrustEngine
 
 app = Flask(__name__)
 security_detector = SecurityDetector()
+trust_engine = get_trust_engine()
 app.config['SECRET_KEY'] = 'clawdbot-security-dashboard'
 socketio = SocketIO(app, cors_allowed_origins="*")
 
@@ -506,6 +508,101 @@ def api_purge():
             pass
     
     return jsonify({'success': True, 'deleted': deleted})
+
+# ============ Trust & Context API ============
+
+@app.route('/api/trust/sessions')
+def api_trust_sessions():
+    """Get list of trusted sessions."""
+    return jsonify({
+        'trusted': list(trust_engine.trusted_sessions),
+        'count': len(trust_engine.trusted_sessions)
+    })
+
+@app.route('/api/trust/session', methods=['POST'])
+def api_trust_session():
+    """Add or remove trust from a session."""
+    from flask import request
+    data = request.get_json()
+    session_id = data.get('sessionId', '')
+    action = data.get('action', 'trust')  # trust or untrust
+    
+    if not session_id:
+        return jsonify({'error': 'No session ID provided'})
+    
+    if action == 'trust':
+        trust_engine.trust_session(session_id)
+        return jsonify({'success': True, 'message': f'Session {session_id[:8]}... is now trusted'})
+    else:
+        trust_engine.untrust_session(session_id)
+        return jsonify({'success': True, 'message': f'Session {session_id[:8]}... removed from trusted'})
+
+@app.route('/api/trust/evaluate', methods=['POST'])
+def api_trust_evaluate():
+    """Evaluate trust level of a command."""
+    from flask import request
+    data = request.get_json()
+    command = data.get('command', '')
+    session_id = data.get('sessionId', '')
+    session_file = data.get('sessionFile', '')
+    
+    if not command:
+        return jsonify({'error': 'No command provided'})
+    
+    session_path = Path(session_file) if session_file else None
+    result = trust_engine.evaluate_command(command, session_id, session_path)
+    return jsonify(result)
+
+@app.route('/api/trust/threat-intel')
+def api_threat_intel():
+    """Get current threat intelligence."""
+    return jsonify({
+        'patterns': trust_engine.threat_intel.get('patterns', {}),
+        'blocked_ips': trust_engine.threat_intel.get('blocked_ips', []),
+        'blocked_domains': trust_engine.threat_intel.get('blocked_domains', []),
+        'updated': trust_engine.threat_intel.get('updated')
+    })
+
+@app.route('/api/trust/block', methods=['POST'])
+def api_trust_block():
+    """Block an IP or domain."""
+    from flask import request
+    data = request.get_json()
+    
+    if 'ip' in data:
+        trust_engine.block_ip(data['ip'])
+        return jsonify({'success': True, 'message': f"Blocked IP: {data['ip']}"})
+    elif 'domain' in data:
+        trust_engine.block_domain(data['domain'])
+        return jsonify({'success': True, 'message': f"Blocked domain: {data['domain']}"})
+    elif 'pattern' in data:
+        trust_engine.add_threat_pattern(
+            data['pattern'], 
+            data.get('reason', 'Custom rule'),
+            data.get('severity', 'high')
+        )
+        return jsonify({'success': True, 'message': f"Added pattern: {data['pattern']}"})
+    else:
+        return jsonify({'error': 'Provide ip, domain, or pattern'})
+
+@app.route('/api/trust/current-session')
+def api_current_session():
+    """Get current active sessions that could be trusted."""
+    sessions = []
+    for jsonl in SESSIONS_DIR.rglob('*.jsonl'):
+        try:
+            mtime = datetime.fromtimestamp(jsonl.stat().st_mtime)
+            if datetime.now() - mtime < timedelta(hours=1):  # Active in last hour
+                session_id = jsonl.stem
+                sessions.append({
+                    'id': session_id,
+                    'file': str(jsonl),
+                    'modified': mtime.isoformat(),
+                    'trusted': trust_engine.is_trusted_session(session_id)
+                })
+        except:
+            pass
+    return jsonify(sorted(sessions, key=lambda x: x['modified'], reverse=True))
 
 @app.route('/api/trace', methods=['POST'])
 def api_trace():
