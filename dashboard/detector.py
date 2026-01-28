@@ -168,7 +168,7 @@ class SecurityDetector:
         alerts = []
 
         # Get current connections
-        output = self._run_cmd("/usr/sbin/lsof -i -n -P 2>/dev/null | grep ESTABLISHED")
+        output = self._run_cmd("lsof -i -n -P 2>/dev/null | grep ESTABLISHED || /usr/sbin/lsof -i -n -P 2>/dev/null | grep ESTABLISHED")
         current = set()
 
         suspicious_ports = {22, 23, 3389, 5900, 4444, 5555, 6666, 1337}  # SSH, Telnet, RDP, VNC, common RAT ports
@@ -233,7 +233,7 @@ class SecurityDetector:
         """Detect new services listening on ports."""
         alerts = []
 
-        output = self._run_cmd("/usr/sbin/lsof -i -n -P 2>/dev/null | grep LISTEN")
+        output = self._run_cmd("lsof -i -n -P 2>/dev/null | grep LISTEN || /usr/sbin/lsof -i -n -P 2>/dev/null | grep LISTEN")
         current = set()
 
         for line in output.strip().split('\n'):

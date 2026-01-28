@@ -95,10 +95,15 @@ jobs:
           name: moltbot-linux
           path: linux
 
+      - name: Rename artifacts
+        run: |
+          mv macos/moltbot macos/moltbot-macos
+          mv linux/moltbot linux/moltbot-linux
+
       - name: Create Release
         uses: softprops/action-gh-release@v1
         with:
           files: |
-            macos/moltbot
-            linux/moltbot
+            macos/moltbot-macos
+            linux/moltbot-linux
           generate_release_notes: true
