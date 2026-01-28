@@ -71,7 +71,7 @@ CORS(app)  # Enable CORS for all routes
 instrument_flask(app)  # OTEL instrumentation
 security_detector = SecurityDetector()
 trust_engine = get_trust_engine()
-app.config['SECRET_KEY'] = 'clawdbot-security-dashboard'
+app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'dev-only-change-in-production')
 socketio = SocketIO(app, cors_allowed_origins="*")
 
 # Paths - use env var for Docker compatibility
