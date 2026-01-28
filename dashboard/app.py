@@ -431,7 +431,7 @@ def get_detailed_network():
                 if direction == 'listening' and local_port:
                     try:
                         local_port_num = int(local_port)
-                        local_threats = threat_intel.analyze_network('0.0.0.0', local_port_num, None)
+                        local_threats = threat_intel.analyze_network('0.0.0.0', local_port_num, None)  # nosec B104
                         if local_threats:
                             # Mark as listening on suspicious port
                             for t in local_threats:
