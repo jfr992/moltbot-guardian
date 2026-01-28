@@ -47,7 +47,7 @@ TOKEN=$(jq -r '.gateway.auth.token' ~/.clawdbot/clawdbot.json)
 # Run Guardian
 docker run -d --name guardian \
   -p 5050:5050 \
-  -v ~/.clawdbot:/data:ro \
+  -v ~/.clawdbot:/data \
   -e CLAWDBOT_API_TOKEN="$TOKEN" \
   ghcr.io/jfr992/moltbot-guardian:latest
 ```
