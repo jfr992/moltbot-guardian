@@ -31,27 +31,34 @@ MoltBot is a comprehensive security monitoring solution designed to detect and p
 
 ## Installation
 
-### Quick Install (Recommended)
-
-```bash
-curl -fsSL https://raw.githubusercontent.com/jfr992/moltbot-security-dashboard/main/install.sh | bash
-```
-
-### Manual Installation
+### Quick Install
 
 ```bash
 git clone https://github.com/jfr992/moltbot-security-dashboard.git
 cd moltbot-security-dashboard
-./setup.sh
+./install.sh
+```
+
+This installs MoltBot to `~/.moltbot` and creates the `moltbot` command.
+
+### Development Setup
+
+If you want to develop or run from source:
+
+```bash
+git clone https://github.com/jfr992/moltbot-security-dashboard.git
+cd moltbot-security-dashboard
+./setup.sh    # Install dependencies
+./start.sh    # Run the dashboard
 ```
 
 ### Requirements
 
-| Component | Version |
-|-----------|---------|
-| Python | 3.9+ |
-| Node.js | 18+ (development only) |
-| OS | macOS 10.15+, Linux (Ubuntu 20.04+) |
+| Component | Version | Notes |
+|-----------|---------|-------|
+| Python | 3.9+ | Required |
+| Node.js | 18+ | Optional (for frontend development) |
+| OS | macOS 10.15+, Linux | Ubuntu 20.04+ recommended |
 
 ---
 
@@ -60,10 +67,12 @@ cd moltbot-security-dashboard
 Start the dashboard:
 
 ```bash
-moltbot
+moltbot                    # If installed via install.sh
+# or
+./start.sh                 # If running from source
 ```
 
-Access the web interface at `http://localhost:5050`
+Open: **http://localhost:5050**
 
 ### Configuration
 

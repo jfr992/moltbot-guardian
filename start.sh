@@ -1,12 +1,16 @@
 #!/bin/bash
-# Start MoltBot Security Dashboard
+# MoltBot Security Dashboard - Start Script
 
-cd "$(dirname "$0")/dashboard"
-source venv/bin/activate
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+cd "$SCRIPT_DIR/dashboard"
 
-echo "🦀 Starting MoltBot Security Dashboard..."
-echo "   Open: http://localhost:5050"
-echo "   Press Ctrl+C to stop"
-echo ""
+# Activate venv if exists
+if [ -f "venv/bin/activate" ]; then
+    source venv/bin/activate
+else
+    echo "❌ Virtual environment not found. Run ./setup.sh first."
+    exit 1
+fi
 
-python app.py
+echo "🦀 Starting MoltBot on http://localhost:5050"
+exec python app.py "$@"

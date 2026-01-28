@@ -368,13 +368,16 @@ def get_file_operations(limit=30):
     return ops[:limit]
 
 # Serve React app
-# Handle both development and PyInstaller bundled paths
+# Handle development, installed, and PyInstaller bundled paths
 import sys
 if getattr(sys, 'frozen', False):
     # Running as PyInstaller bundle
     REACT_BUILD = Path(sys._MEIPASS) / 'dashboard-ui' / 'dist'
+elif (Path(__file__).parent / 'static').exists():
+    # Running from installed location (~/.moltbot/dashboard/static)
+    REACT_BUILD = Path(__file__).parent / 'static'
 else:
-    # Running from source
+    # Running from source (development)
     REACT_BUILD = Path(__file__).parent.parent / 'dashboard-ui' / 'dist'
 
 @app.route('/')
