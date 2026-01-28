@@ -361,7 +361,14 @@ def get_file_operations(limit=30):
     return ops[:limit]
 
 # Serve React app
-REACT_BUILD = Path(__file__).parent.parent / 'dashboard-ui' / 'dist'
+# Handle both development and PyInstaller bundled paths
+import sys
+if getattr(sys, 'frozen', False):
+    # Running as PyInstaller bundle
+    REACT_BUILD = Path(sys._MEIPASS) / 'dashboard-ui' / 'dist'
+else:
+    # Running from source
+    REACT_BUILD = Path(__file__).parent.parent / 'dashboard-ui' / 'dist'
 
 @app.route('/')
 def dashboard():

@@ -1,0 +1,81 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  build:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        include:
+          - os: macos-latest
+            artifact: moltbot-macos
+          - os: ubuntu-latest
+            artifact: moltbot-linux
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Build frontend
+        run: |
+          cd dashboard-ui
+          npm ci
+          npm run build
+
+      - name: Install PyInstaller
+        run: |
+          pip install pyinstaller
+          pip install -r dashboard/requirements.txt
+
+      - name: Build executable
+        run: |
+          cd dashboard
+          pyinstaller --onefile --name moltbot \
+            --add-data "../dashboard-ui/dist:dashboard-ui/dist" \
+            app.py
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.artifact }}
+          path: dashboard/dist/moltbot*
+
+  release:
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Download macOS artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: moltbot-macos
+          path: macos
+
+      - name: Download Linux artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: moltbot-linux
+          path: linux
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v1
+        with:
+          files: |
+            macos/moltbot
+            linux/moltbot
+          generate_release_notes: true

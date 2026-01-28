@@ -6,6 +6,19 @@ Real-time security monitoring for AI agents. Detect prompt injection, suspicious
 ![Python](https://img.shields.io/badge/Python-3.9+-blue?style=flat-square)
 ![React](https://img.shields.io/badge/React-18+-cyan?style=flat-square)
 ![License](https://img.shields.io/badge/License-MIT-green?style=flat-square)
+![CI](https://github.com/jfr992/moltbot-security-dashboard/actions/workflows/ci.yml/badge.svg)
+
+## One-Line Install
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/jfr992/moltbot-security-dashboard/main/install.sh | bash
+```
+
+Then run:
+```bash
+moltbot
+# Open http://localhost:5050
+```
 
 ## Features
 
