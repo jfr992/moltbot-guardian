@@ -1089,14 +1089,14 @@ def api_alert_action():
 
                 # Try to abort any active generation
                 try:
-                    gateway.request('chat.abort', {'sessionKey': session_id})
+                    gateway.request('chat.abort', {'key': session_id})
                     results.append('Aborted active generation')
                 except Exception as e:
                     errors.append(f'Abort: {str(e)}')
 
                 # Reset the session (clears history)
                 try:
-                    gateway.request('sessions.reset', {'sessionKey': session_id})
+                    gateway.request('sessions.reset', {'key': session_id})
                     results.append('Session reset')
                 except Exception as e:
                     errors.append(f'Reset: {str(e)}')
@@ -1305,7 +1305,7 @@ def api_kill_session():
         # First, try to abort any active generation
         if action in ('abort', 'kill'):
             try:
-                gateway.request('chat.abort', {'sessionKey': session_id})
+                gateway.request('chat.abort', {'key': session_id})
                 results.append('Aborted active generation')
             except Exception as e:
                 errors.append(f'Abort failed: {str(e)}')
@@ -1313,7 +1313,7 @@ def api_kill_session():
         # Reset the session (clears history but keeps session)
         if action in ('reset', 'kill'):
             try:
-                gateway.request('sessions.reset', {'sessionKey': session_id})
+                gateway.request('sessions.reset', {'key': session_id})
                 results.append('Session reset')
             except Exception as e:
                 errors.append(f'Reset failed: {str(e)}')
@@ -1321,7 +1321,7 @@ def api_kill_session():
         # Delete the session entirely
         if action == 'delete':
             try:
-                gateway.request('sessions.delete', {'sessionKey': session_id})
+                gateway.request('sessions.delete', {'key': session_id})
                 results.append('Session deleted')
             except Exception as e:
                 errors.append(f'Delete failed: {str(e)}')
