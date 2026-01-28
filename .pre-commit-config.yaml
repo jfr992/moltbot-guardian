@@ -46,6 +46,20 @@ repos:
         pass_filenames: false
 
   # =============================================================================
+  # UNIT TESTS - Run before every commit
+  # =============================================================================
+
+  - repo: local
+    hooks:
+      - id: pytest
+        name: "🧪 Pytest - Run unit tests"
+        entry: bash -c 'cd dashboard && pip3 install -q pytest pytest-mock && python3 -m pytest tests/ -v --tb=short'
+        language: system
+        files: ^dashboard/.*\.py$
+        pass_filenames: false
+        always_run: true
+
+  # =============================================================================
   # GENERAL CODE QUALITY
   # =============================================================================
 
@@ -83,7 +97,7 @@ repos:
         args: ['--branch', 'main', '--branch', 'master']
 
   # =============================================================================
-  # JAVASCRIPT/NODE SECURITY
+  # JAVASCRIPT/NODE SECURITY & LINTING
   # =============================================================================
 
   - repo: local
@@ -93,6 +107,13 @@ repos:
         entry: bash -c 'cd dashboard-ui && npm audit --audit-level=high || true'
         language: system
         files: package\.json$
+        pass_filenames: false
+
+      - id: eslint
+        name: "📝 ESLint - JavaScript linter"
+        entry: bash -c 'cd dashboard-ui && npm run lint --if-present || echo "⚠️ ESLint has warnings - see output above"'
+        language: system
+        files: ^dashboard-ui/.*\.(js|jsx)$
         pass_filenames: false
 
   # =============================================================================
