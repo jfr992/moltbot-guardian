@@ -1,16 +1,24 @@
+# MoltBot Guardian - Docker Compose
+# Usage: docker compose up -d
+
 services:
-  security-dashboard:
+  guardian:
     build: .
+    container_name: moltbot-guardian
     ports:
       - "5050:5050"
     volumes:
       - ~/.clawdbot:/data:ro
-      - security-data:/app/data
+      - guardian-data:/home/moltbot
     environment:
-      - MOLTBOT_HOST=0.0.0.0
-      - MOLTBOT_PORT=5050
-      - CLAWDBOT_DIR=/data
+      MOLTBOT_HOST: "0.0.0.0"
+      MOLTBOT_PORT: "5050"
+      CLAWDBOT_DIR: "/data"
     restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
 
 volumes:
-  security-data:
+  guardian-data:

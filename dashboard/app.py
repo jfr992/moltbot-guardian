@@ -416,6 +416,16 @@ def serve_assets(filename):
 def favicon():
     return send_from_directory(REACT_BUILD, 'favicon.svg')
 
+@app.route('/api/health')
+def api_health():
+    """Health check endpoint for Docker/K8s."""
+    gateway = get_gateway_client()
+    return jsonify({
+        'status': 'ok',
+        'gateway': gateway.connected if gateway else False,
+        'timestamp': datetime.now().isoformat()
+    })
+
 @app.route('/api/activity')
 def api_activity():
     return jsonify({
