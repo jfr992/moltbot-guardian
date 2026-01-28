@@ -45,7 +45,7 @@ export default function MetricCards({ data, alertCount, compact }) {
       <MetricCard
         title="Connections"
         value={data?.connections?.length ?? '-'}
-        subtitle="Node processes"
+        subtitle="Active network"
         icon={Globe}
         color="bg-cyan-500/10 text-cyan-400"
         compact={compact}

@@ -28,10 +28,18 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements.txt
 
-      - name: Test import
+      - name: Test imports
         run: |
           cd dashboard
-          python -c "import app; import detector; print('✅ Imports OK')"
+          python -c "
+          import app
+          import detector
+          import baseline
+          import crypto
+          import smart_alerts
+          import trust
+          print('✅ All imports OK')
+          "
 
   build-frontend:
     runs-on: ubuntu-latest
