@@ -1,6 +1,6 @@
 <div align="center">
 
-# 🦀 MoltBot Guardian
+# 🦀 CrabGuard
 
 **Security dashboard extension for MoltBot operations**
 
@@ -22,19 +22,6 @@ An **optional security layer** for [molt.bot](https://molt.bot) that monitors yo
 - 🌐 **Network Monitor** — Track active connections with process attribution
 
 Reads from `~/.clawdbot` (where molt.bot stores session logs).
-
----
-
-## vs Crabwalk
-
-| | **This (Security)** | **[Crabwalk](https://github.com/luccast/crabwalk)** |
-|---|---|---|
-| **Purpose** | Detect threats | Watch agents work |
-| **View** | Activity log + alerts | Node graph visualization |
-| **Focus** | Security monitoring | Real-time streaming |
-| **Use case** | "Is my agent doing something bad?" | "What is my agent doing?" |
-
-**They're complementary** — use both for full visibility.
 
 ---
 
