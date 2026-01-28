@@ -1,8 +1,8 @@
 <div align="center">
 
-# 🦀 MoltBot Security Dashboard
+# 🦀 MoltBot Guardian
 
-**Real-time security monitoring for [molt.bot](https://molt.bot) AI agents**
+**Security dashboard extension for MoltBot operations**
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Python 3.9+](https://img.shields.io/badge/python-3.9+-blue.svg)](https://www.python.org/downloads/)
