@@ -80,8 +80,14 @@ export default function AlertsPanel({ alerts, onRefresh, dimmed, expanded }) {
         console.error('Failed to whitelist:', e)
       }
     } else {
-      await alertAction(action, alertId, data)
-      if (action === 'dismiss') onRefresh()
+      const result = await alertAction(action, alertId, data)
+      if (result.success) {
+        if (action === 'dismiss' || action === 'kill') onRefresh()
+      } else {
+        // Show error to user
+        const errorMsg = result.hint || result.message || result.error || 'Action failed'
+        alert(`⚠️ ${errorMsg}`)
+      }
     }
   }
 

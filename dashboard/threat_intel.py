@@ -232,21 +232,136 @@ THREAT_PATTERNS: List[ThreatPattern] = [
     ),
 ]
 
-# Suspicious network destinations
-SUSPICIOUS_DESTINATIONS = [
-    # Known bad IPs would go here (placeholder)
-    # In production, this would be loaded from threat feeds
+# Suspicious network destinations - domains associated with malware/C2
+SUSPICIOUS_DOMAINS = [
+    # Tunneling / Proxy services (potential C2)
+    ("ngrok.io", "Tunneling service - potential C2", "high"),
+    ("ngrok.com", "Tunneling service - potential C2", "high"),
+    ("serveo.net", "SSH tunneling service", "high"),
+    ("localtunnel.me", "Tunneling service", "medium"),
+    ("localhost.run", "SSH tunneling service", "medium"),
+    ("telebit.cloud", "Tunneling service", "medium"),
+    ("pagekite.me", "Tunneling service", "medium"),
+    ("bore.pub", "Tunneling service", "medium"),
+
+    # Anonymous file sharing (exfiltration risk)
+    ("pastebin.com", "Public paste service - exfil risk", "medium"),
+    ("hastebin.com", "Public paste service - exfil risk", "medium"),
+    ("ghostbin.com", "Public paste service - exfil risk", "medium"),
+    ("0x0.st", "Anonymous file hosting", "high"),
+    ("file.io", "Ephemeral file sharing", "medium"),
+    ("transfer.sh", "Anonymous file transfer", "medium"),
+    ("temp.sh", "Temporary file hosting", "medium"),
+    ("catbox.moe", "Anonymous file hosting", "medium"),
+    ("litterbox.catbox.moe", "Anonymous file hosting", "medium"),
+    ("uguu.se", "Anonymous file hosting", "medium"),
+    ("fileditch.com", "Anonymous file hosting", "medium"),
+
+    # Known malware / C2 infrastructure patterns
+    ("tor2web", "Tor gateway - dark web access", "critical"),
+    (".onion.", "Tor hidden service", "critical"),
+    ("duckdns.org", "Dynamic DNS - often used by malware", "high"),
+    ("no-ip.com", "Dynamic DNS - often used by malware", "high"),
+    ("no-ip.org", "Dynamic DNS - often used by malware", "high"),
+    ("dynu.com", "Dynamic DNS - potential C2", "medium"),
+    ("freedns.afraid.org", "Dynamic DNS - potential C2", "medium"),
+    ("changeip.com", "Dynamic DNS - potential C2", "medium"),
+
+    # Crypto mining pools
+    (".pool.", "Possible crypto mining pool", "high"),
+    ("nanopool.org", "Crypto mining pool", "high"),
+    ("f2pool.com", "Crypto mining pool", "high"),
+    ("antpool.com", "Crypto mining pool", "high"),
+    ("ethermine.org", "Crypto mining pool", "high"),
+    ("2miners.com", "Crypto mining pool", "high"),
+    ("nicehash.com", "Crypto mining pool", "high"),
+    ("minergate.com", "Crypto mining pool", "high"),
+    ("slushpool.com", "Crypto mining pool", "high"),
+
+    # VPN/Proxy services that may hide traffic
+    ("mullvad.net", "VPN service - may hide traffic", "low"),
+    ("nordvpn.com", "VPN service - may hide traffic", "low"),
+    ("expressvpn.com", "VPN service - may hide traffic", "low"),
+
+    # Request/webhook catchers (exfil testing)
+    ("requestbin.com", "HTTP request capture", "medium"),
+    ("webhook.site", "Webhook capture service", "medium"),
+    ("pipedream.com", "Webhook capture service", "medium"),
+    ("beeceptor.com", "HTTP mock/capture service", "medium"),
+    ("httpbin.org", "HTTP testing service", "low"),
+    ("postb.in", "HTTP request capture", "medium"),
+    ("requestcatcher.com", "HTTP request capture", "medium"),
+    ("hookbin.com", "Webhook capture", "medium"),
+
+    # IP lookup (recon)
+    ("ipinfo.io", "IP information lookup - recon", "low"),
+    ("ip-api.com", "IP information lookup - recon", "low"),
+    ("ifconfig.me", "External IP lookup - recon", "low"),
+    ("icanhazip.com", "External IP lookup - recon", "low"),
+    ("checkip.amazonaws.com", "External IP lookup - recon", "low"),
+
+    # Suspicious TLDs often used by attackers
+    (".top", "Suspicious TLD - often abused", "low"),
+    (".xyz", "Suspicious TLD - often abused", "low"),
+    (".tk", "Free TLD - often abused", "medium"),
+    (".ml", "Free TLD - often abused", "medium"),
+    (".ga", "Free TLD - often abused", "medium"),
+    (".cf", "Free TLD - often abused", "medium"),
+    (".gq", "Free TLD - often abused", "medium"),
+]
+
+# Suspicious IP ranges (CIDR notation would be ideal but using prefixes for simplicity)
+SUSPICIOUS_IP_RANGES = [
+    # Tor exit nodes (sample - would need live feed in production)
+    ("185.220.101.", "Known Tor exit node range", "high"),
+    ("185.220.102.", "Known Tor exit node range", "high"),
+    ("45.153.160.", "Bulletproof hosting", "high"),
+    ("194.26.192.", "Bulletproof hosting", "high"),
 ]
 
 # Suspicious ports
 SUSPICIOUS_PORTS = {
-    4444: "Metasploit default",
-    5555: "Common RAT port",
-    6666: "IRC/Botnet",
-    6667: "IRC",
-    31337: "Elite/Back Orifice",
-    12345: "NetBus",
-    27374: "SubSeven",
+    # RATs and backdoors
+    4444: ("Metasploit default", "critical"),
+    4445: ("Metasploit/Meterpreter", "critical"),
+    5555: ("Common RAT port / ADB", "high"),
+    6666: ("IRC/Botnet", "high"),
+    6667: ("IRC (unencrypted)", "medium"),
+    6697: ("IRC over TLS", "low"),
+    31337: ("Elite/Back Orifice", "critical"),
+    12345: ("NetBus", "critical"),
+    27374: ("SubSeven", "critical"),
+    1337: ("Elite hacker port", "high"),
+    1234: ("Common backdoor port", "medium"),
+
+    # Remote access
+    3389: ("RDP - Remote Desktop", "medium"),
+    5900: ("VNC", "medium"),
+    5901: ("VNC", "medium"),
+    22: ("SSH - expected but monitor", "low"),
+    23: ("Telnet - insecure", "high"),
+
+    # Crypto mining
+    3333: ("Common crypto mining pool port", "high"),
+    8008: ("Common crypto mining pool port", "high"),
+    8080: ("HTTP alt - may be mining or proxy", "low"),
+    9999: ("Common malware/mining port", "medium"),
+    14444: ("Mining pool port", "high"),
+    45700: ("Monero mining", "high"),
+
+    # Proxy/Tunneling
+    1080: ("SOCKS proxy", "medium"),
+    8888: ("HTTP proxy / Jupyter", "low"),
+    9050: ("Tor SOCKS proxy", "high"),
+    9051: ("Tor control port", "high"),
+    9150: ("Tor Browser SOCKS", "high"),
+
+    # Other suspicious
+    6379: ("Redis - should not be exposed", "high"),
+    27017: ("MongoDB - should not be exposed", "high"),
+    11211: ("Memcached - should not be exposed", "high"),
+    2375: ("Docker API unencrypted - critical exposure", "critical"),
+    2376: ("Docker API - should verify TLS", "medium"),
 }
 
 
@@ -277,18 +392,77 @@ class ThreatIntel:
 
         return matches
 
-    def analyze_network(self, remote: str, port: int) -> Optional[Dict]:
+    def analyze_network(self, remote: str, port: int, hostname: str = None) -> List[Dict]:
         """Analyze network connection for suspicious activity."""
-        if port in SUSPICIOUS_PORTS:
-            return {
-                'threat_id': f'NET-{port}',
-                'name': f'Suspicious Port {port}',
-                'description': SUSPICIOUS_PORTS[port],
-                'severity': 'high',
+        threats = []
+
+        # Check suspicious ports
+        if port and port in SUSPICIOUS_PORTS:
+            port_info = SUSPICIOUS_PORTS[port]
+            threats.append({
+                'threat_id': f'NET-PORT-{port}',
+                'name': f'Suspicious Port: {port}',
+                'description': port_info[0],
+                'severity': port_info[1],
                 'category': 'network',
-                'remediation': f'Investigate why port {port} is being used.',
-            }
-        return None
+                'indicator': f'port:{port}',
+                'remediation': f'Investigate why port {port} is being used. {port_info[0]}',
+            })
+
+        # Check hostname/domain for suspicious patterns
+        check_hostname = (hostname or '').lower()
+        check_remote = (remote or '').lower()
+
+        for domain_pattern, description, severity in SUSPICIOUS_DOMAINS:
+            if domain_pattern in check_hostname or domain_pattern in check_remote:
+                threats.append({
+                    'threat_id': f'NET-DOMAIN-{hash(domain_pattern) % 10000}',
+                    'name': f'Suspicious Domain: {domain_pattern}',
+                    'description': description,
+                    'severity': severity,
+                    'category': 'network',
+                    'indicator': f'domain:{domain_pattern}',
+                    'matched': hostname or remote,
+                    'remediation': f'Investigate connection to {domain_pattern}. {description}',
+                })
+
+        # Check IP ranges
+        for ip_prefix, description, severity in SUSPICIOUS_IP_RANGES:
+            if remote and remote.startswith(ip_prefix):
+                threats.append({
+                    'threat_id': f'NET-IP-{hash(ip_prefix) % 10000}',
+                    'name': f'Suspicious IP Range',
+                    'description': description,
+                    'severity': severity,
+                    'category': 'network',
+                    'indicator': f'ip:{ip_prefix}*',
+                    'matched': remote,
+                    'remediation': f'Investigate connection to {remote}. {description}',
+                })
+
+        return threats
+
+    def analyze_connection(self, conn: Dict) -> Dict:
+        """Analyze a full connection dict and return enriched info."""
+        remote = conn.get('remote', '')
+        hostname = conn.get('hostname', '')
+        port = 0
+
+        # Extract port from remote
+        if ':' in remote:
+            try:
+                port = int(remote.split(':')[-1])
+            except ValueError:
+                pass
+
+        threats = self.analyze_network(remote.split(':')[0] if ':' in remote else remote, port, hostname)
+
+        return {
+            **conn,
+            'threats': threats,
+            'is_suspicious': len(threats) > 0,
+            'max_severity': max([t['severity'] for t in threats], key=lambda s: {'low': 1, 'medium': 2, 'high': 3, 'critical': 4}.get(s, 0)) if threats else None,
+        }
 
     def get_all_patterns(self) -> List[Dict]:
         """Get all threat patterns for display."""

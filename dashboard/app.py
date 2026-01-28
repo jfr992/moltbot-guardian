@@ -29,6 +29,42 @@ from telemetry import (
     instrument_flask, record_alert, record_tool_call,
     record_tokens, record_cost, record_connections, traced
 )
+import socket
+from functools import lru_cache
+
+# DNS resolution cache with TTL
+_dns_cache = {}
+_dns_cache_ttl = 300  # 5 minutes
+
+def resolve_hostname(ip: str) -> str:
+    """Resolve IP to hostname with caching."""
+    if not ip or ip in ['-', '', '0.0.0.0', '127.0.0.1', '::1']:
+        return None
+
+    # Check cache
+    now = time.time()
+    if ip in _dns_cache:
+        hostname, timestamp = _dns_cache[ip]
+        if now - timestamp < _dns_cache_ttl:
+            return hostname
+
+    # Try reverse DNS lookup
+    try:
+        hostname = socket.gethostbyaddr(ip)[0]
+        _dns_cache[ip] = (hostname, now)
+        return hostname
+    except (socket.herror, socket.gaierror, OSError):
+        _dns_cache[ip] = (None, now)
+        return None
+
+def resolve_hostnames_batch(ips: list) -> dict:
+    """Resolve multiple IPs to hostnames."""
+    results = {}
+    for ip in ips:
+        hostname = resolve_hostname(ip)
+        if hostname:
+            results[ip] = hostname
+    return results
 
 app = Flask(__name__)
 CORS(app)  # Enable CORS for all routes
@@ -240,13 +276,15 @@ def get_detailed_network():
         }
     }
 
+    # Use threat intel for analysis
+    threat_intel = get_threat_intel()
+
     # Check if lsof is available
     lsof = find_lsof()
     if not lsof:
         # Use /proc/net fallback for Docker/Linux
         proc_connections = get_proc_net_connections()
         for conn in proc_connections:
-            result['connections'].append(conn)
             result['stats']['total_connections'] += 1
 
             if conn.get('state') == 'ESTABLISHED':
@@ -262,18 +300,43 @@ def get_detailed_network():
             proto = conn.get('protocol', 'OTHER')
             result['protocols'][proto] = result['protocols'].get(proto, 0) + 1
 
-            # Track remote hosts
+            # Track remote hosts and analyze threats
             remote = conn.get('remote', '').split(':')[0]
+            port = 0
+            if ':' in conn.get('remote', ''):
+                try:
+                    port = int(conn.get('remote', '').split(':')[-1])
+                except ValueError:
+                    pass
+
             if remote and remote not in ['', '-', '0.0.0.0', '127.0.0.1', '::1']:  # nosec B104
                 if remote not in result['remote_hosts']:
                     result['remote_hosts'][remote] = {'count': 0, 'ports': [], 'processes': []}
                 result['remote_hosts'][remote]['count'] += 1
 
-        return result
+                # Analyze for threats
+                threats = threat_intel.analyze_network(remote, port, conn.get('hostname'))
+                if threats:
+                    conn['threats'] = threats
+                    conn['is_suspicious'] = True
+                    conn['max_severity'] = max(
+                        [t['severity'] for t in threats],
+                        key=lambda s: {'low': 1, 'medium': 2, 'high': 3, 'critical': 4}.get(s, 0)
+                    )
+                    for threat in threats:
+                        result['suspicious'].append({
+                            'type': threat.get('category', 'network'),
+                            'threat_id': threat.get('threat_id'),
+                            'severity': threat.get('severity'),
+                            'description': f"{conn.get('process', 'unknown')}: {threat.get('description')}",
+                            'indicator': threat.get('indicator'),
+                            'remediation': threat.get('remediation'),
+                            'connection': conn
+                        })
 
-    # Known suspicious ports/hosts
-    suspicious_ports = {22: 'SSH', 23: 'Telnet', 3389: 'RDP', 4444: 'Metasploit', 5555: 'ADB'}
-    suspicious_hosts = ['pastebin.com', 'ngrok.io', 'serveo.net', 'localtunnel.me']
+            result['connections'].append(conn)
+
+        return result
 
     try:
         # Get all connections with lsof
@@ -358,25 +421,29 @@ def get_detailed_network():
                     result['remote_hosts'][remote_addr]['ports'].add(remote_port)
                 result['remote_hosts'][remote_addr]['processes'].add(process)
 
-            # Check for suspicious activity
+            # Check for suspicious activity using threat intel
             try:
                 port_num = int(remote_port) if remote_port else 0
-                if port_num in suspicious_ports:
-                    result['suspicious'].append({
-                        'type': 'suspicious_port',
-                        'description': f"{process} connecting to {suspicious_ports[port_num]} port ({port_num})",
-                        'connection': conn_data
-                    })
+                threats = threat_intel.analyze_network(remote_addr, port_num, conn_data.get('hostname'))
+                if threats:
+                    conn_data['threats'] = threats
+                    conn_data['is_suspicious'] = True
+                    conn_data['max_severity'] = max(
+                        [t['severity'] for t in threats],
+                        key=lambda s: {'low': 1, 'medium': 2, 'high': 3, 'critical': 4}.get(s, 0)
+                    )
+                    for threat in threats:
+                        result['suspicious'].append({
+                            'type': threat.get('category', 'network'),
+                            'threat_id': threat.get('threat_id'),
+                            'severity': threat.get('severity'),
+                            'description': f"{process}: {threat.get('description')}",
+                            'indicator': threat.get('indicator'),
+                            'remediation': threat.get('remediation'),
+                            'connection': conn_data
+                        })
             except ValueError:
                 pass
-
-            for sus_host in suspicious_hosts:
-                if sus_host in remote_addr.lower():
-                    result['suspicious'].append({
-                        'type': 'suspicious_host',
-                        'description': f"{process} connecting to {sus_host}",
-                        'connection': conn_data
-                    })
 
     except Exception as e:
         result['error'] = str(e)
@@ -385,6 +452,61 @@ def get_detailed_network():
     for host_data in result['remote_hosts'].values():
         host_data['ports'] = list(host_data['ports'])
         host_data['processes'] = list(host_data['processes'])
+
+    # Resolve hostnames for remote IPs
+    for ip in list(result['remote_hosts'].keys()):
+        hostname = resolve_hostname(ip)
+        if hostname:
+            result['remote_hosts'][ip]['hostname'] = hostname
+
+    # Also add hostname to individual connections and re-analyze with hostname
+    for conn in result['connections']:
+        remote_ip = conn.get('remote', '').split(':')[0] if conn.get('remote') else None
+        if remote_ip and remote_ip not in ['-', '', '0.0.0.0', '127.0.0.1']:
+            hostname = resolve_hostname(remote_ip)
+            if hostname:
+                conn['hostname'] = hostname
+
+                # Re-analyze threats with hostname if not already suspicious
+                if not conn.get('is_suspicious'):
+                    port = 0
+                    if ':' in conn.get('remote', ''):
+                        try:
+                            port = int(conn.get('remote', '').split(':')[-1])
+                        except ValueError:
+                            pass
+
+                    threats = threat_intel.analyze_network(remote_ip, port, hostname)
+                    if threats:
+                        conn['threats'] = threats
+                        conn['is_suspicious'] = True
+                        conn['max_severity'] = max(
+                            [t['severity'] for t in threats],
+                            key=lambda s: {'low': 1, 'medium': 2, 'high': 3, 'critical': 4}.get(s, 0)
+                        )
+                        for threat in threats:
+                            result['suspicious'].append({
+                                'type': threat.get('category', 'network'),
+                                'threat_id': threat.get('threat_id'),
+                                'severity': threat.get('severity'),
+                                'description': f"{conn.get('process', 'unknown')}: {threat.get('description')}",
+                                'indicator': threat.get('indicator'),
+                                'remediation': threat.get('remediation'),
+                                'connection': conn
+                            })
+
+    # Calculate threat summary
+    severity_counts = {'critical': 0, 'high': 0, 'medium': 0, 'low': 0}
+    for sus in result['suspicious']:
+        sev = sus.get('severity', 'medium')
+        if sev in severity_counts:
+            severity_counts[sev] += 1
+
+    result['threat_summary'] = {
+        'total_threats': len(result['suspicious']),
+        'by_severity': severity_counts,
+        'suspicious_connections': sum(1 for c in result['connections'] if c.get('is_suspicious')),
+    }
 
     return result
 
@@ -561,6 +683,38 @@ def api_network():
 def api_network_detailed():
     """Wireshark-style detailed network information."""
     return jsonify(get_detailed_network())
+
+
+@app.route('/api/network/resolve')
+def api_network_resolve():
+    """Resolve IP address to hostname."""
+    ip = request.args.get('ip')
+    if not ip:
+        return jsonify({'error': 'Missing ip parameter'}), 400
+
+    hostname = resolve_hostname(ip)
+    return jsonify({
+        'ip': ip,
+        'hostname': hostname,
+        'resolved': hostname is not None
+    })
+
+
+@app.route('/api/network/resolve-batch', methods=['POST'])
+def api_network_resolve_batch():
+    """Resolve multiple IP addresses to hostnames."""
+    data = request.get_json() or {}
+    ips = data.get('ips', [])
+
+    if not ips:
+        return jsonify({'error': 'Missing ips array'}), 400
+
+    results = resolve_hostnames_batch(ips)
+    return jsonify({
+        'resolved': results,
+        'count': len(results)
+    })
+
 
 @app.route('/api/alerts')
 def api_alerts():
@@ -921,26 +1075,47 @@ def api_alert_action():
             return jsonify({'success': True, 'message': 'Alert dismissed', 'dismissed_index': alert_index})
 
         elif action == 'kill':
-            # Kill the session - find and terminate the clawdbot process
+            # Kill the session via Gateway API
             if session_file:
                 # Extract session ID from file path
                 session_id = Path(session_file).stem
 
-                # Try to find and kill related processes
-                result = subprocess.run(
-                    ['pkill', '-f', f'clawdbot.*{session_id[:8]}'],
-                    capture_output=True, timeout=5
-                )
+                gateway = get_gateway_client()
+                if not gateway.connected:
+                    return jsonify({'success': False, 'error': 'Gateway not connected'})
 
-                # Also try killing by gateway
-                subprocess.run(
-                    ['pkill', '-f', 'clawdbot gateway'],
-                    capture_output=True, timeout=5
-                )
+                results = []
+                errors = []
+
+                # Try to abort any active generation
+                try:
+                    gateway.request('chat.abort', {'sessionKey': session_id})
+                    results.append('Aborted active generation')
+                except Exception as e:
+                    errors.append(f'Abort: {str(e)}')
+
+                # Reset the session (clears history)
+                try:
+                    gateway.request('sessions.reset', {'sessionKey': session_id})
+                    results.append('Session reset')
+                except Exception as e:
+                    errors.append(f'Reset: {str(e)}')
+
+                if not results and errors:
+                    # Check if it's a scope/permission issue
+                    if any('scope' in e.lower() or 'permission' in e.lower() for e in errors):
+                        return jsonify({
+                            'success': False,
+                            'message': f'Insufficient permissions to kill session {session_id[:8]}',
+                            'hint': 'The dashboard API token needs operator.write and operator.admin scopes. Generate a new token with: clawdbot config set gateway.auth.tokens.dashboard.scopes \'["operator.admin"]\'',
+                            'errors': errors
+                        })
 
                 return jsonify({
-                    'success': True,
-                    'message': f'Attempted to kill session {session_id[:8]}...'
+                    'success': len(results) > 0,
+                    'message': f'Kill actions for {session_id[:8]}...',
+                    'results': results,
+                    'errors': errors if errors else None
                 })
             return jsonify({'success': False, 'error': 'No session file provided'})
 
@@ -1026,6 +1201,22 @@ def api_baseline_whitelist():
     return jsonify({'success': True, 'message': 'Added to whitelist'})
 
 
+@app.route('/api/baseline/rotate', methods=['POST'])
+def api_baseline_rotate():
+    """Force rotation of current window to save in-progress learning."""
+    baseline = get_baseline()
+    window_data = dict(baseline.current_window)
+    baseline._rotate_window()
+
+    return jsonify({
+        'success': True,
+        'message': 'Window rotated',
+        'window_saved': bool(window_data.get('counts')),
+        'windows_collected': len(baseline.baseline.get('windows', [])),
+        'learned': baseline.baseline.get('learned', False)
+    })
+
+
 # --- Threat Intelligence API ---
 
 @app.route('/api/threat-intel')
@@ -1095,20 +1286,59 @@ def api_gateway_connect():
 
 @app.route('/api/sessions/kill', methods=['POST'])
 def api_kill_session():
-    """Kill an agent session."""
+    """Kill/abort an agent session."""
     data = request.get_json() or {}
-    session_id = data.get('session_id')
+    session_id = data.get('session_id') or data.get('sessionKey')
+    action = data.get('action', 'abort')  # abort, reset, or delete
 
     if not session_id:
         return jsonify({'success': False, 'error': 'session_id required'}), 400
 
-    # Try to kill via gateway client
-    # For now, just return success - actual implementation depends on gateway API
-    return jsonify({
-        'success': True,
-        'message': f'Kill request sent for session {session_id}',
-        'note': 'Session termination depends on gateway support'
-    })
+    gateway = get_gateway_client()
+    if not gateway.connected:
+        return jsonify({'success': False, 'error': 'Gateway not connected'}), 503
+
+    results = []
+    errors = []
+
+    try:
+        # First, try to abort any active generation
+        if action in ('abort', 'kill'):
+            try:
+                gateway.request('chat.abort', {'sessionKey': session_id})
+                results.append('Aborted active generation')
+            except Exception as e:
+                errors.append(f'Abort failed: {str(e)}')
+
+        # Reset the session (clears history but keeps session)
+        if action in ('reset', 'kill'):
+            try:
+                gateway.request('sessions.reset', {'sessionKey': session_id})
+                results.append('Session reset')
+            except Exception as e:
+                errors.append(f'Reset failed: {str(e)}')
+
+        # Delete the session entirely
+        if action == 'delete':
+            try:
+                gateway.request('sessions.delete', {'sessionKey': session_id})
+                results.append('Session deleted')
+            except Exception as e:
+                errors.append(f'Delete failed: {str(e)}')
+
+        return jsonify({
+            'success': len(results) > 0,
+            'session_id': session_id,
+            'action': action,
+            'results': results,
+            'errors': errors if errors else None
+        })
+
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
 
 
 def background_monitor():
@@ -1427,6 +1657,31 @@ if __name__ == '__main__':
         print("🔗 Gateway connection: starting background thread...")
     except Exception as e:
         print(f"⚠️  Gateway connection skipped: {e}")
+
+    # Graceful shutdown: save baseline on exit
+    import atexit
+    import signal
+
+    def save_baseline_on_exit():
+        """Save current window to baseline before shutdown."""
+        try:
+            baseline = get_baseline()
+            if baseline.current_window.get('counts'):
+                print("[Shutdown] Saving baseline window...")
+                baseline._rotate_window()
+                print("[Shutdown] Baseline saved.")
+        except Exception as e:
+            print(f"[Shutdown] Failed to save baseline: {e}")
+
+    atexit.register(save_baseline_on_exit)
+
+    def signal_handler(signum, frame):
+        print(f"\n[Signal] Received {signum}, shutting down gracefully...")
+        save_baseline_on_exit()
+        raise SystemExit(0)
+
+    signal.signal(signal.SIGTERM, signal_handler)
+    signal.signal(signal.SIGINT, signal_handler)
 
     host = os.environ.get('MOLTBOT_HOST', '127.0.0.1')
     port = int(os.environ.get('MOLTBOT_PORT', 5050))

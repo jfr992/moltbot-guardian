@@ -18,6 +18,9 @@ from baseline import get_baseline
 from smart_alerts import get_smart_filter
 from telemetry import record_alert
 
+# Clawdbot directory - use env var for Docker compatibility
+CLAWDBOT_DIR = Path(os.environ.get('CLAWDBOT_DIR', str(Path.home() / '.clawdbot')))
+
 # Alert severity levels
 CRITICAL = "critical"
 HIGH = "high"
@@ -302,7 +305,7 @@ class SecurityDetector:
             Path.home() / '.ssh',
             Path.home() / '.aws',
             Path.home() / '.gnupg',
-            Path.home() / '.clawdbot' / 'credentials',
+            CLAWDBOT_DIR / 'credentials',
         ]
 
         # Ignore these file patterns (normal activity)
@@ -536,7 +539,7 @@ class SecurityDetector:
         """Monitor MoltBot session logs for suspicious tool usage."""
         alerts = []
 
-        sessions_dir = Path.home() / '.clawdbot' / 'agents'
+        sessions_dir = CLAWDBOT_DIR / 'agents'
         if not sessions_dir.exists():
             return alerts
 
@@ -589,10 +592,16 @@ class SecurityDetector:
 
                         # Extract tool calls
                         for block in msg.get('content', []):
-                            if block.get('type') != 'tool_use':
+                            if block.get('type') not in ('tool_use', 'toolCall'):
                                 continue
                             tool_name = block.get('name', '')
-                            tool_input = block.get('input', {})
+                            # Support both Anthropic format (input) and Clawdbot format (arguments)
+                            tool_input = block.get('input') or block.get('arguments') or {}
+                            if isinstance(tool_input, str):
+                                try:
+                                    tool_input = json.loads(tool_input)
+                                except:
+                                    tool_input = {'raw': tool_input}
 
                             # Get the actual command/content
                             command = tool_input.get('command', '')

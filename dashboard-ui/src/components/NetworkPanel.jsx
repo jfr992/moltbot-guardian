@@ -1,5 +1,13 @@
 import { useState, useEffect } from 'react'
-import { Globe, Shield, AlertTriangle, CheckCircle, Radio, Wifi } from 'lucide-react'
+import { Globe, Shield, AlertTriangle, CheckCircle, Radio, Wifi, Skull, AlertOctagon, Activity, ExternalLink } from 'lucide-react'
+
+// Severity color mapping
+const SEVERITY_COLORS = {
+  critical: { bg: 'bg-red-500/20', border: 'border-red-500/50', text: 'text-red-400', icon: Skull },
+  high: { bg: 'bg-orange-500/20', border: 'border-orange-500/50', text: 'text-orange-400', icon: AlertOctagon },
+  medium: { bg: 'bg-yellow-500/20', border: 'border-yellow-500/50', text: 'text-yellow-400', icon: AlertTriangle },
+  low: { bg: 'bg-blue-500/20', border: 'border-blue-500/50', text: 'text-blue-400', icon: Activity },
+}
 
 // Known safe services for categorization
 const KNOWN_SERVICES = {
@@ -46,6 +54,18 @@ function categorizeConnection(conn) {
     return { name: 'Local Service', icon: '🏠', safe: true, type: 'local' }
   }
 
+  // Docker bridge networks (172.16-31.x.x)
+  if (conn.remote?.match(/^172\.(1[6-9]|2[0-9]|3[0-1])\./) ||
+      conn.remote?.includes('host.docker.internal')) {
+    return { name: 'Docker Bridge', icon: '🐳', safe: true, type: 'local' }
+  }
+
+  // Local network (LAN)
+  if (conn.remote?.match(/^192\.168\./) ||
+      conn.remote?.match(/^10\./)) {
+    return { name: 'Local Network', icon: '🏠', safe: true, type: 'local' }
+  }
+
   return { name: 'Unknown', icon: '❓', safe: false, type: 'unknown' }
 }
 
@@ -76,13 +96,13 @@ export default function NetworkPanel({ connections, expanded }) {
       const category = categorizeConnection(conn)
 
       if (category.type === 'local') {
-        const processName = conn.process || 'Unknown'
-        if (!summary.local[processName]) {
-          summary.local[processName] = { name: processName, count: 0, ports: new Set(), states: new Set() }
+        const groupName = category.name || conn.process || 'Unknown'
+        if (!summary.local[groupName]) {
+          summary.local[groupName] = { name: groupName, icon: category.icon, count: 0, ports: new Set(), states: new Set() }
         }
-        summary.local[processName].count++
-        if (conn.local) summary.local[processName].ports.add(conn.local.split(':').pop())
-        if (conn.state) summary.local[processName].states.add(conn.state)
+        summary.local[groupName].count++
+        if (conn.local) summary.local[groupName].ports.add(conn.local.split(':').pop())
+        if (conn.state) summary.local[groupName].states.add(conn.state)
       } else if (category.type === 'known') {
         if (!summary.known[category.name]) {
           summary.known[category.name] = { ...category, count: 0 }
@@ -125,6 +145,19 @@ export default function NetworkPanel({ connections, expanded }) {
       </div>
 
       <div className="p-4 h-64 overflow-y-auto">
+        {/* All safe banner */}
+        {!hasUnknown && (Object.keys(summary.known).length > 0 || Object.keys(summary.local).length > 0) && (
+          <div className="mb-4 p-3 bg-status-safe/10 border border-status-safe/30 rounded-lg">
+            <div className="flex items-center gap-2">
+              <CheckCircle className="w-5 h-5 text-status-safe" />
+              <div>
+                <p className="text-sm text-status-safe font-semibold">All Clear</p>
+                <p className="text-xs text-shell-400">No suspicious outbound connections detected</p>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Known services */}
         {Object.values(summary.known).length > 0 && (
           <div className="mb-4">
@@ -144,7 +177,7 @@ export default function NetworkPanel({ connections, expanded }) {
         {/* Local services */}
         {Object.keys(summary.local).length > 0 && (
           <div className="mb-4">
-            <p className="text-xs font-mono text-shell-500 uppercase tracking-wide mb-2">Local Services</p>
+            <p className="text-xs font-mono text-shell-500 uppercase tracking-wide mb-2">Local &amp; Internal Traffic</p>
             <div className="space-y-1">
               {Object.values(summary.local)
                 .sort((a, b) => b.count - a.count)
@@ -154,6 +187,7 @@ export default function NetworkPanel({ connections, expanded }) {
                   <div className="flex items-center gap-2">
                     <Radio className="w-3 h-3 text-neon-green" />
                     <span className="text-sm text-white font-mono">{proc.name}</span>
+                    {proc.icon && <span className="text-sm">{proc.icon}</span>}
                   </div>
                   <div className="text-xs text-shell-500 font-mono">
                     {proc.count} conn{proc.count !== 1 ? 's' : ''}
@@ -161,22 +195,48 @@ export default function NetworkPanel({ connections, expanded }) {
                 </div>
               ))}
             </div>
+            <p className="text-xs text-shell-600 mt-2">
+              Internal connections (Docker, LAN, localhost) — safe to ignore
+            </p>
           </div>
         )}
 
-        {/* Unknown connections */}
+        {/* Unknown/Suspicious connections */}
         {summary.unknown.length > 0 && (
           <div>
             <p className="text-xs font-mono text-status-warn uppercase tracking-wide mb-2 flex items-center gap-2">
-              <AlertTriangle className="w-3 h-3" /> Unknown Connections
+              <AlertTriangle className="w-3 h-3" /> Unknown/Suspicious Connections
             </p>
             <div className="space-y-2">
-              {summary.unknown.slice(0, 5).map((conn, i) => (
-                <div key={i} className="p-2 bg-status-warn/10 border border-status-warn/30 rounded-lg">
-                  <p className="text-sm text-white font-mono">{conn.process}</p>
-                  <p className="text-xs text-status-warn font-mono">{conn.remote}</p>
-                </div>
-              ))}
+              {summary.unknown.slice(0, 5).map((conn, i) => {
+                const severity = conn.max_severity || 'medium'
+                const colors = SEVERITY_COLORS[severity] || SEVERITY_COLORS.medium
+                const SeverityIcon = colors.icon
+
+                return (
+                  <div key={i} className={`p-2 ${colors.bg} border ${colors.border} rounded-lg`}>
+                    <div className="flex items-center justify-between">
+                      <p className="text-sm text-white font-mono">{conn.process}</p>
+                      {conn.is_suspicious && (
+                        <span className={`flex items-center gap-1 text-xs ${colors.text} font-semibold uppercase`}>
+                          <SeverityIcon className="w-3 h-3" />
+                          {severity}
+                        </span>
+                      )}
+                    </div>
+                    <p className={`text-xs ${colors.text} font-mono`}>
+                      {conn.hostname ? `${conn.hostname} (${conn.remote})` : conn.remote}
+                    </p>
+                    {conn.threats && conn.threats.length > 0 && (
+                      <div className="mt-1 text-xs text-shell-400">
+                        {conn.threats.slice(0, 2).map((t, ti) => (
+                          <p key={ti}>⚠️ {t.name}: {t.description}</p>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )
+              })}
             </div>
           </div>
         )}
@@ -254,7 +314,8 @@ function DetailedNetworkView({ data, loading, onRefresh }) {
       return (
         conn.process?.toLowerCase().includes(searchLower) ||
         conn.remote?.toLowerCase().includes(searchLower) ||
-        conn.local?.toLowerCase().includes(searchLower)
+        conn.local?.toLowerCase().includes(searchLower) ||
+        conn.hostname?.toLowerCase().includes(searchLower)
       )
     }
     return true
@@ -326,24 +387,85 @@ function DetailedNetworkView({ data, loading, onRefresh }) {
               </div>
             </div>
 
-            {/* Unknown */}
+            {/* Threat Summary */}
+            {data.threat_summary && data.threat_summary.total_threats > 0 && (
+              <div className="mb-6">
+                <h3 className="text-xs font-mono text-red-400 uppercase tracking-wide mb-3 flex items-center gap-2">
+                  <Skull className="w-4 h-4" /> Threat Detection Summary
+                </h3>
+                <div className="grid grid-cols-4 gap-3">
+                  {Object.entries(data.threat_summary.by_severity).map(([sev, count]) => {
+                    if (count === 0) return null
+                    const colors = SEVERITY_COLORS[sev]
+                    const SevIcon = colors?.icon || AlertTriangle
+                    return (
+                      <div key={sev} className={`p-3 ${colors?.bg || 'bg-shell-800'} border ${colors?.border || 'border-shell-700'} rounded-lg text-center`}>
+                        <SevIcon className={`w-5 h-5 mx-auto mb-1 ${colors?.text || 'text-white'}`} />
+                        <p className={`text-2xl font-bold ${colors?.text || 'text-white'}`}>{count}</p>
+                        <p className="text-xs text-shell-400 uppercase">{sev}</p>
+                      </div>
+                    )
+                  })}
+                </div>
+              </div>
+            )}
+
+            {/* Unknown/Suspicious Connections */}
             {summary.unknown.length > 0 && (
               <div>
                 <h3 className="text-xs font-mono text-status-warn uppercase tracking-wide mb-3 flex items-center gap-2">
-                  <AlertTriangle className="w-4 h-4" /> Unknown Connections
+                  <AlertTriangle className="w-4 h-4" /> Suspicious Connections ({summary.unknown.length})
                 </h3>
                 <div className="space-y-2">
-                  {summary.unknown.map((conn, i) => (
-                    <div key={i} className="p-3 bg-status-warn/10 border border-status-warn/30 rounded-lg">
-                      <div className="flex items-center justify-between">
-                        <div>
-                          <p className="text-white font-mono font-semibold">{conn.process}</p>
-                          <p className="text-sm text-status-warn font-mono">{conn.remote}</p>
+                  {summary.unknown.map((conn, i) => {
+                    const severity = conn.max_severity || 'medium'
+                    const colors = SEVERITY_COLORS[severity] || SEVERITY_COLORS.medium
+                    const SeverityIcon = colors.icon
+
+                    return (
+                      <div key={i} className={`p-3 ${colors.bg} border ${colors.border} rounded-lg`}>
+                        <div className="flex items-center justify-between mb-2">
+                          <div className="flex items-center gap-2">
+                            <SeverityIcon className={`w-5 h-5 ${colors.text}`} />
+                            <p className="text-white font-mono font-semibold">{conn.process}</p>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <span className={`text-xs ${colors.text} font-bold uppercase px-2 py-0.5 rounded ${colors.bg}`}>
+                              {severity}
+                            </span>
+                            <span className="badge badge-medium">{conn.state}</span>
+                          </div>
                         </div>
-                        <span className="badge badge-medium">{conn.state}</span>
+
+                        <div className="mb-2">
+                          {conn.hostname ? (
+                            <p className={`text-sm ${colors.text} font-mono`}>
+                              {conn.hostname} <span className="text-shell-500">({conn.remote})</span>
+                            </p>
+                          ) : (
+                            <p className={`text-sm ${colors.text} font-mono`}>{conn.remote}</p>
+                          )}
+                        </div>
+
+                        {/* Threat details */}
+                        {conn.threats && conn.threats.length > 0 && (
+                          <div className="mt-2 pt-2 border-t border-shell-700/50 space-y-1">
+                            {conn.threats.map((threat, ti) => (
+                              <div key={ti} className="text-xs">
+                                <p className={`font-semibold ${colors.text}`}>
+                                  ⚠️ {threat.name}
+                                </p>
+                                <p className="text-shell-400">{threat.description}</p>
+                                {threat.remediation && (
+                                  <p className="text-shell-500 italic mt-1">💡 {threat.remediation}</p>
+                                )}
+                              </div>
+                            ))}
+                          </div>
+                        )}
                       </div>
-                    </div>
-                  ))}
+                    )
+                  })}
                 </div>
               </div>
             )}
@@ -389,20 +511,45 @@ function DetailedNetworkView({ data, loading, onRefresh }) {
                 ) : (
                   filteredConnections.map((conn, i) => {
                     const category = categorizeConnection(conn)
+                    const severity = conn.max_severity
+                    const colors = severity ? SEVERITY_COLORS[severity] : null
+
                     return (
                       <div
                         key={i}
                         className={`grid grid-cols-12 gap-2 px-4 py-2 text-xs border-b border-shell-800 hover:bg-shell-800 transition-colors ${
-                          category.type === 'unknown' ? 'bg-status-warn/5' : ''
+                          conn.is_suspicious ? `${colors?.bg || 'bg-status-warn/5'}` : category.type === 'unknown' ? 'bg-status-warn/5' : ''
                         }`}
                       >
-                        <div className="col-span-2 text-white font-mono truncate" title={conn.process}>{conn.process}</div>
+                        <div className="col-span-2 text-white font-mono truncate flex items-center gap-1" title={conn.process}>
+                          {conn.is_suspicious && (
+                            <span title={`${severity} threat`}>
+                              {severity === 'critical' && <Skull className="w-3 h-3 text-red-400" />}
+                              {severity === 'high' && <AlertOctagon className="w-3 h-3 text-orange-400" />}
+                              {severity === 'medium' && <AlertTriangle className="w-3 h-3 text-yellow-400" />}
+                              {severity === 'low' && <Activity className="w-3 h-3 text-blue-400" />}
+                            </span>
+                          )}
+                          {conn.process}
+                        </div>
                         <div className="col-span-1 text-shell-500 font-mono">{conn.pid}</div>
                         <div className="col-span-3 text-shell-400 font-mono truncate" title={conn.local}>{conn.local}</div>
-                        <div className="col-span-4 text-shell-400 font-mono truncate" title={conn.remote}>{conn.remote || '-'}</div>
+                        <div className={`col-span-4 font-mono truncate ${conn.is_suspicious ? colors?.text : 'text-shell-400'}`} title={conn.hostname ? `${conn.hostname} (${conn.remote})` : conn.remote}>
+                          {conn.hostname ? (
+                            <span>
+                              <span className={conn.is_suspicious ? colors?.text : 'text-neon-cyan'}>{conn.hostname}</span>
+                              <span className="text-shell-600 text-[10px] ml-1">:{conn.remote?.split(':')[1]}</span>
+                            </span>
+                          ) : (conn.remote || '-')}
+                          {conn.threats && conn.threats.length > 0 && (
+                            <span className="ml-1 text-shell-500" title={conn.threats.map(t => t.name).join(', ')}>
+                              ({conn.threats.length} threat{conn.threats.length > 1 ? 's' : ''})
+                            </span>
+                          )}
+                        </div>
                         <div className="col-span-2">
                           <span className={`font-mono ${
-                            conn.state === 'ESTABLISHED' ? 'text-status-safe' :
+                            conn.state === 'ESTABLISHED' ? (conn.is_suspicious ? colors?.text : 'text-status-safe') :
                             conn.state === 'LISTEN' ? 'text-neon-blue' : 'text-shell-500'
                           }`}>
                             {conn.state || '-'}
