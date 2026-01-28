@@ -15,14 +15,15 @@ CLAWDBOT_CONFIG = Path.home() / '.clawdbot' / 'clawdbot.json'
 
 def create_connect_params(token: Optional[str] = None) -> Dict[str, Any]:
     """Create connection params for gateway handshake."""
+    import platform as plat
     return {
         "minProtocol": 3,
         "maxProtocol": 3,
         "client": {
-            "id": "moltbot-guardian",
+            "id": "cli",  # Must be 'cli' for operator role
             "displayName": "MoltBot Guardian",
             "version": "1.0.0",
-            "platform": "linux",
+            "platform": plat.system().lower(),
             "mode": "cli",
         },
         "role": "operator",
