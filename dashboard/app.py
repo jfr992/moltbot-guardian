@@ -1143,3 +1143,94 @@ if __name__ == '__main__':
     print("=" * 40 + "\n")
 
     socketio.run(app, host=host, port=port, debug=False, allow_unsafe_werkzeug=True)
+
+
+# --- Usage/Cost Tracking API ---
+
+@app.route('/api/usage')
+def api_usage():
+    """Get token usage and cost statistics from Clawdbot sessions."""
+    from datetime import datetime, timedelta
+    import glob
+
+    clawdbot_dir = os.environ.get('CLAWDBOT_DIR', str(Path.home() / '.clawdbot'))
+    sessions_pattern = f"{clawdbot_dir}/agents/*/sessions/*.jsonl"
+
+    usage = {
+        'total_cost': 0,
+        'total_input_tokens': 0,
+        'total_output_tokens': 0,
+        'total_cache_read': 0,
+        'total_cache_write': 0,
+        'sessions_analyzed': 0,
+        'messages_analyzed': 0,
+        'by_model': {},
+        'by_day': {},
+        'recent_calls': []
+    }
+
+    today = datetime.now().date()
+    week_ago = today - timedelta(days=7)
+
+    for session_file in glob.glob(sessions_pattern):
+        try:
+            usage['sessions_analyzed'] += 1
+            with open(session_file, 'r') as f:
+                for line in f:
+                    try:
+                        entry = json.loads(line)
+                        msg = entry.get('message', {})
+                        msg_usage = msg.get('usage', {})
+
+                        if msg_usage:
+                            usage['messages_analyzed'] += 1
+                            cost_data = msg_usage.get('cost', {})
+
+                            # Aggregate totals
+                            usage['total_input_tokens'] += msg_usage.get('input', 0)
+                            usage['total_output_tokens'] += msg_usage.get('output', 0)
+                            usage['total_cache_read'] += msg_usage.get('cacheRead', 0)
+                            usage['total_cache_write'] += msg_usage.get('cacheWrite', 0)
+                            usage['total_cost'] += cost_data.get('total', 0)
+
+                            # By model
+                            model = msg.get('model', 'unknown')
+                            if model not in usage['by_model']:
+                                usage['by_model'][model] = {'tokens': 0, 'cost': 0, 'calls': 0}
+                            usage['by_model'][model]['tokens'] += msg_usage.get('totalTokens', 0)
+                            usage['by_model'][model]['cost'] += cost_data.get('total', 0)
+                            usage['by_model'][model]['calls'] += 1
+
+                            # By day
+                            ts = entry.get('timestamp', '')
+                            if ts:
+                                try:
+                                    day = ts[:10]  # YYYY-MM-DD
+                                    if day not in usage['by_day']:
+                                        usage['by_day'][day] = {'tokens': 0, 'cost': 0}
+                                    usage['by_day'][day]['tokens'] += msg_usage.get('totalTokens', 0)
+                                    usage['by_day'][day]['cost'] += cost_data.get('total', 0)
+                                except:
+                                    pass
+
+                            # Recent calls (last 10)
+                            if len(usage['recent_calls']) < 10:
+                                usage['recent_calls'].append({
+                                    'model': model,
+                                    'tokens': msg_usage.get('totalTokens', 0),
+                                    'cost': cost_data.get('total', 0),
+                                    'timestamp': entry.get('timestamp', '')
+                                })
+                    except json.JSONDecodeError:
+                        continue
+        except Exception as e:
+            print(f"Error reading session {session_file}: {e}")
+
+    # Round costs
+    usage['total_cost'] = round(usage['total_cost'], 4)
+    for model in usage['by_model']:
+        usage['by_model'][model]['cost'] = round(usage['by_model'][model]['cost'], 4)
+    for day in usage['by_day']:
+        usage['by_day'][day]['cost'] = round(usage['by_day'][day]['cost'], 4)
+
+    return jsonify(usage)

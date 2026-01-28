@@ -114,7 +114,7 @@ export default function AlertsPanel({ alerts, onRefresh, dimmed, expanded }) {
         </div>
 
         {/* Alerts List */}
-        <div className={`p-4 overflow-y-auto ${expanded ? 'h-[600px]' : 'h-96'}`}>
+        <div className={`p-4 overflow-y-auto ${expanded ? 'h-[600px]' : 'h-72'}`}>
           {alerts.length === 0 ? (
             <div className="flex flex-col items-center justify-center h-full text-center animate-fade-in">
               <div className="w-16 h-16 rounded-full bg-status-safe/10 flex items-center justify-center mb-4 glow-green">

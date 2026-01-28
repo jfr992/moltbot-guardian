@@ -59,11 +59,11 @@ export default function App() {
         onOpenSettings={() => setSettingsOpen(true)}
       />
 
-      <main className="ml-16 p-6">
+      <main className="ml-16 p-4">
         <Header onOpenPrivacy={() => setPrivacyOpen(true)} />
 
         {/* Metrics - always visible but compact when zoomed */}
-        <div className={`transition-all duration-300 ${isZoomed ? 'mb-4' : 'mb-6'}`}>
+        <div className={`transition-all duration-300 ${isZoomed ? 'mb-3' : 'mb-4'}`}>
           <MetricCards data={data} alertCount={alerts.length} compact={isZoomed} />
         </div>
 

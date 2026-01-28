@@ -392,14 +392,14 @@ function DetailedNetworkView({ data, loading, onRefresh }) {
                     return (
                       <div
                         key={i}
-                        className={`table-row grid grid-cols-12 gap-2 px-4 py-2 text-xs ${
+                        className={`grid grid-cols-12 gap-2 px-4 py-2 text-xs border-b border-shell-800 hover:bg-shell-800 transition-colors ${
                           category.type === 'unknown' ? 'bg-status-warn/5' : ''
                         }`}
                       >
-                        <div className="col-span-2 text-white font-mono truncate">{conn.process}</div>
+                        <div className="col-span-2 text-white font-mono truncate" title={conn.process}>{conn.process}</div>
                         <div className="col-span-1 text-shell-500 font-mono">{conn.pid}</div>
-                        <div className="col-span-3 text-shell-400 font-mono truncate">{conn.local}</div>
-                        <div className="col-span-4 text-shell-400 font-mono truncate">{conn.remote || '-'}</div>
+                        <div className="col-span-3 text-shell-400 font-mono truncate" title={conn.local}>{conn.local}</div>
+                        <div className="col-span-4 text-shell-400 font-mono truncate" title={conn.remote}>{conn.remote || '-'}</div>
                         <div className="col-span-2">
                           <span className={`font-mono ${
                             conn.state === 'ESTABLISHED' ? 'text-status-safe' :

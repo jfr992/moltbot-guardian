@@ -6,7 +6,7 @@ export default function PrivacyModal({ isOpen, onClose }) {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
       <div className="absolute inset-0 bg-black/80" onClick={onClose} />
-      <div className="relative bg-[var(--dark-800)] rounded-xl border border-white/10 p-6 max-w-2xl w-full">
+      <div className="relative bg-shell-900 rounded-xl border border-shell-700 p-6 max-w-2xl w-full max-h-[85vh] overflow-y-auto">
         <div className="flex items-center justify-between mb-6">
           <div className="flex items-center gap-2">
             <Lock className="w-5 h-5 text-cyan-400" />

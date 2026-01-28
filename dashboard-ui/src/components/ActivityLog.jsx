@@ -41,7 +41,7 @@ export default function ActivityLog({ operations, lastUpdate, dimmed }) {
         </span>
       </div>
 
-      <div className="p-4 h-96 overflow-y-auto">
+      <div className="p-4 h-72 overflow-y-auto">
         {!operations || operations.length === 0 ? (
           <div className="text-shell-500 text-sm text-center py-8 font-mono">
             <Terminal className="w-8 h-8 mx-auto mb-2 opacity-50" />

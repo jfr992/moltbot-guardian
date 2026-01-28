@@ -1,4 +1,4 @@
-import { Shield, Brain, Lock, Activity } from 'lucide-react'
+import { Shield, Brain, Lock, Activity, DollarSign } from 'lucide-react'
 import { useState, useEffect } from 'react'
 import { io } from 'socket.io-client'
 
@@ -15,6 +15,7 @@ export default function Header({ onOpenPrivacy }) {
   const [time, setTime] = useState(new Date())
   const [baseline, setBaseline] = useState(null)
   const [securityStatus, setSecurityStatus] = useState({ status: 'ok', alert_count: 0 })
+  const [usage, setUsage] = useState(null)
 
   useEffect(() => {
     const interval = setInterval(() => setTime(new Date()), 1000)
@@ -30,6 +31,18 @@ export default function Header({ onOpenPrivacy }) {
     }
     fetchBaseline()
     const interval = setInterval(fetchBaseline, 30000)
+    return () => clearInterval(interval)
+  }, [])
+
+  useEffect(() => {
+    async function fetchUsage() {
+      try {
+        const res = await fetch('/api/usage')
+        if (res.ok) setUsage(await res.json())
+      } catch (e) {}
+    }
+    fetchUsage()
+    const interval = setInterval(fetchUsage, 60000) // Update every minute
     return () => clearInterval(interval)
   }, [])
 
@@ -55,7 +68,7 @@ export default function Header({ onOpenPrivacy }) {
   const isAlert = securityStatus.status === 'alert' || securityStatus.alert_count > 0
 
   return (
-    <header className="flex items-center justify-between mb-8 relative z-10">
+    <header className="flex items-center justify-between mb-4 relative z-10">
       {/* Logo & Title */}
       <div className="flex items-center gap-4">
         {/* Shield Icon with Glow */}
@@ -95,6 +108,19 @@ export default function Header({ onOpenPrivacy }) {
             <Brain className={`w-4 h-4 ${baseline.learned ? 'text-neon-purple' : 'text-shell-500'}`} />
             <span className={`text-xs font-mono ${baseline.learned ? 'text-neon-purple' : 'text-shell-500'}`}>
               {baseline.learned ? 'BASELINE ACTIVE' : `LEARNING ${Math.round(baseline.windows_collected / baseline.windows_needed * 100)}%`}
+            </span>
+          </div>
+        )}
+
+        {/* Usage/Cost Display */}
+        {usage && usage.total_cost > 0 && (
+          <div
+            className="flex items-center gap-2 px-3 py-2 rounded-lg bg-neon-green/10 border border-neon-green/30"
+            title={`${usage.total_input_tokens?.toLocaleString() || 0} input + ${usage.total_output_tokens?.toLocaleString() || 0} output tokens`}
+          >
+            <DollarSign className="w-4 h-4 text-neon-green" />
+            <span className="text-xs font-mono text-neon-green">
+              ${usage.total_cost.toFixed(2)}
             </span>
           </div>
         )}

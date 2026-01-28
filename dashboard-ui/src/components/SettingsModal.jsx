@@ -267,7 +267,7 @@ export default function SettingsModal({ isOpen, onClose }) {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
       <div className="absolute inset-0 bg-black/80" onClick={onClose} />
-      <div className="relative bg-[var(--dark-800)] rounded-xl border border-white/10 p-6 max-w-lg w-full">
+      <div className="relative bg-shell-900 rounded-xl border border-shell-700 p-6 max-w-lg w-full max-h-[85vh] overflow-y-auto">
         <div className="flex items-center justify-between mb-6">
           <h3 className="text-lg font-semibold text-white">Settings</h3>
           <button onClick={onClose} className="text-gray-500 hover:text-white">
