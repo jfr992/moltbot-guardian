@@ -18,9 +18,9 @@ try:
     HAS_CRYPTO = True
 except ImportError:
     try:
-        from Crypto.Cipher import AES
-        from Crypto.Protocol.KDF import PBKDF2
-        from Crypto.Random import get_random_bytes
+        from Crypto.Cipher import AES  # nosec B413 - fallback only, cryptography preferred
+        from Crypto.Protocol.KDF import PBKDF2  # nosec B413
+        from Crypto.Random import get_random_bytes  # nosec B413
         HAS_CRYPTO = True
         USE_PYCRYPTO = True
     except ImportError:

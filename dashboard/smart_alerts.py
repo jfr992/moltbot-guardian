@@ -35,7 +35,7 @@ class SmartAlertFilter:
             'Library/Caches',
             'Library/Preferences',
             '/var/folders/',
-            '/tmp/',
+            '/tmp/',  # nosec B108 - filter pattern
             
             # IDE/Editor
             '.vscode/',

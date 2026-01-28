@@ -97,10 +97,15 @@ class SecurityDetector:
         self.state_file.write_text(json.dumps(self.state, indent=2))
     
     def _run_cmd(self, cmd, timeout=10):
-        """Run a command and return output."""
+        """Run a command and return output.
+        
+        Note: shell=True is intentional - this is a security monitoring tool
+        that needs to run system commands to check network/process state.
+        """
         try:
-            result = subprocess.run(cmd, shell=True, capture_output=True, 
-                                   text=True, timeout=timeout)
+            result = subprocess.run(  # nosec B602 - intentional for security monitoring
+                cmd, shell=True, capture_output=True, text=True, timeout=timeout
+            )
             return result.stdout
         except:
             return ""
@@ -303,7 +308,7 @@ class SecurityDetector:
         suspicious_patterns = [
             r'nc\s+-l',  # netcat listener
             r'ncat\s+-l',
-            r'/tmp/.*sh',  # shell in tmp
+            r'/tmp/.*sh',  # nosec B108 - detection pattern
             r'python.*-c.*socket',  # python reverse shell
             r'bash.*-i.*>&',  # bash reverse shell
             r'curl.*\|.*sh',  # curl pipe to shell

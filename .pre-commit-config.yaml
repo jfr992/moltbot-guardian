@@ -1,0 +1,30 @@
+repos:
+  # Python security - Bandit
+  - repo: https://github.com/PyCQA/bandit
+    rev: 1.7.7
+    hooks:
+      - id: bandit
+        args: ["-r", "dashboard/", "-ll", "-ii"]
+        exclude: "test_|venv/"
+
+  # Python dependency vulnerabilities
+  - repo: https://github.com/pypa/pip-audit
+    rev: v2.7.1
+    hooks:
+      - id: pip-audit
+        args: ["--requirement", "dashboard/requirements.txt"]
+
+  # Secrets detection
+  - repo: https://github.com/Yelp/detect-secrets
+    rev: v1.4.0
+    hooks:
+      - id: detect-secrets
+        args: ["--baseline", ".secrets.baseline"]
+        exclude: "package-lock.json|venv/"
+
+  # General security patterns
+  - repo: https://github.com/returntocorp/semgrep
+    rev: v1.52.0
+    hooks:
+      - id: semgrep
+        args: ["--config", "auto", "--error", "--exclude", "venv", "--exclude", "node_modules"]
