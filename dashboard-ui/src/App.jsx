@@ -241,7 +241,25 @@ function FileOpsPanel({ operations }) {
 
 // Expanded file operations for zoomed view
 function ExpandedFileOps({ operations }) {
-  const allOps = operations || []
+  const [timeFilter, setTimeFilter] = useState('all') // 'all', '1h', '6h', '24h'
+
+  // Time filter options
+  const timeFilters = [
+    { key: '1h', label: 'Last 1h', ms: 60 * 60 * 1000 },
+    { key: '6h', label: 'Last 6h', ms: 6 * 60 * 60 * 1000 },
+    { key: '24h', label: 'Last 24h', ms: 24 * 60 * 60 * 1000 },
+    { key: 'all', label: 'All Time', ms: null },
+  ]
+
+  // Filter operations by time
+  const now = Date.now()
+  const allOps = (operations || []).filter(op => {
+    if (timeFilter === 'all') return true
+    const filterMs = timeFilters.find(f => f.key === timeFilter)?.ms
+    if (!filterMs || !op.timestamp) return true
+    const opTime = new Date(op.timestamp).getTime()
+    return (now - opTime) <= filterMs
+  })
 
   // Operation type definitions with colors and labels
   const opTypes = [
@@ -268,21 +286,43 @@ function ExpandedFileOps({ operations }) {
     <>
       <div className="px-5 py-4 border-b border-shell-700 flex items-center justify-between">
         <h2 className="font-display font-semibold text-white text-lg uppercase tracking-wide">File Operations</h2>
-        <span className="badge badge-info">{allOps.length} total</span>
+        <div className="flex items-center gap-2">
+          {/* Time filter buttons */}
+          <div className="flex gap-1 bg-shell-900 rounded-lg p-1 border border-shell-700">
+            {timeFilters.map(f => (
+              <button
+                key={f.key}
+                onClick={() => setTimeFilter(f.key)}
+                className={`px-2 py-1 rounded text-xs font-mono transition-colors ${
+                  timeFilter === f.key ? 'bg-neon-cyan/20 text-neon-cyan' : 'text-shell-500 hover:text-white'
+                }`}
+              >
+                {f.label}
+              </button>
+            ))}
+          </div>
+          <span className="badge badge-info">{allOps.length} ops</span>
+        </div>
       </div>
       <div className="p-6">
         {/* Stats row - dynamic grid based on active types */}
         <div className={`grid gap-4 mb-6 ${activeTypes.length <= 4 ? 'grid-cols-4' : 'grid-cols-4 lg:grid-cols-8'}`}>
-          {activeTypes.map(t => (
-            <div key={t.key} className={`rounded-lg p-4 border ${t.bg} ${t.border} hover:scale-105 transition-transform`}>
-              <div className={`metric-value ${t.text}`}>{counts[t.key]}</div>
-              <div className="metric-label mt-1 flex items-center gap-1">
-                <span>{t.label.split(' ')[0]}</span>
-                <span className="hidden sm:inline">{t.label.split(' ')[1]}</span>
-              </div>
-              <div className="text-[10px] text-shell-500 mt-1 hidden lg:block">{t.desc}</div>
+          {activeTypes.length === 0 ? (
+            <div className="col-span-4 text-center text-shell-500 py-4 font-mono">
+              No operations in selected time period
             </div>
-          ))}
+          ) : (
+            activeTypes.map(t => (
+              <div key={t.key} className={`rounded-lg p-4 border ${t.bg} ${t.border} hover:scale-105 transition-transform`}>
+                <div className={`metric-value ${t.text}`}>{counts[t.key]}</div>
+                <div className="metric-label mt-1 flex items-center gap-1">
+                  <span>{t.label.split(' ')[0]}</span>
+                  <span className="hidden sm:inline">{t.label.split(' ')[1]}</span>
+                </div>
+                <div className="text-[10px] text-shell-500 mt-1 hidden lg:block">{t.desc}</div>
+              </div>
+            ))
+          )}
         </div>
 
         {/* Full list */}
