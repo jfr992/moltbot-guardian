@@ -21,10 +21,10 @@ services:
     volumes:
       - ./otel-collector-config.yaml:/etc/otel-collector-config.yaml:ro
     ports:
-      - "4317:4317"   # OTLP gRPC
-      - "4318:4318"   # OTLP HTTP
-      - "8889:8889"   # Prometheus metrics
-      - "8888:8888"   # Collector metrics
+      - "127.0.0.1:4317:4317"   # OTLP gRPC
+      - "127.0.0.1:4318:4318"   # OTLP HTTP
+      - "127.0.0.1:8889:8889"   # Prometheus metrics
+      - "127.0.0.1:8888:8888"   # Collector metrics
     restart: unless-stopped
 
   prometheus:
@@ -38,7 +38,7 @@ services:
       - ./prometheus.yml:/etc/prometheus/prometheus.yml:ro
       - prometheus-data:/prometheus
     ports:
-      - "9090:9090"
+      - "127.0.0.1:9090:9090"  # Localhost only
     depends_on:
       - otel-collector
     restart: unless-stopped
@@ -55,7 +55,7 @@ services:
       - grafana-data:/var/lib/grafana
       - ./grafana/provisioning:/etc/grafana/provisioning:ro
     ports:
-      - "3000:3000"
+      - "127.0.0.1:3000:3000"  # Localhost only
     depends_on:
       - prometheus
     restart: unless-stopped
