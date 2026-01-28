@@ -161,78 +161,53 @@ export default function App() {
   )
 }
 
-// Compact file operations panel for normal view
+// File Operations Stats Panel (counters only, no list)
 function FileOpsPanel({ operations }) {
   const allOps = operations || []
 
-  // Count by operation type
-  const counts = {
-    READ: allOps.filter(op => op.operation?.includes('READ')).length,
-    WRITE: allOps.filter(op => op.operation?.includes('WRITE')).length,
-    EDIT: allOps.filter(op => op.operation?.includes('EDIT')).length,
-    EXEC: allOps.filter(op => op.operation?.includes('EXEC')).length,
-    OTHER: allOps.filter(op =>
-      !op.operation?.includes('READ') &&
-      !op.operation?.includes('WRITE') &&
-      !op.operation?.includes('EDIT') &&
-      !op.operation?.includes('EXEC')
-    ).length,
-  }
+  // Operation type definitions
+  const opTypes = [
+    { key: 'READ', label: 'Read', icon: '📖', color: 'text-neon-blue', bg: 'bg-neon-blue/10', border: 'border-neon-blue/30' },
+    { key: 'WRITE', label: 'Write', icon: '✏️', color: 'text-neon-purple', bg: 'bg-neon-purple/10', border: 'border-neon-purple/30' },
+    { key: 'EDIT', label: 'Edit', icon: '🔧', color: 'text-neon-pink', bg: 'bg-neon-pink/10', border: 'border-neon-pink/30' },
+    { key: 'EXEC', label: 'Exec', icon: '⚡', color: 'text-neon-cyan', bg: 'bg-neon-cyan/10', border: 'border-neon-cyan/30' },
+    { key: 'MESSAGE', label: 'Msg', icon: '💬', color: 'text-neon-orange', bg: 'bg-neon-orange/10', border: 'border-neon-orange/30' },
+    { key: 'BROWSER', label: 'Browser', icon: '🖥️', color: 'text-shell-300', bg: 'bg-shell-700', border: 'border-shell-600' },
+  ]
 
-  const opColors = {
-    READ: { text: 'text-neon-blue', label: '📖' },
-    WRITE: { text: 'text-neon-purple', label: '✏️' },
-    EDIT: { text: 'text-neon-pink', label: '🔧' },
-    EXEC: { text: 'text-neon-cyan', label: '⚡' },
-    OTHER: { text: 'text-shell-400', label: '📦' },
-  }
+  // Calculate counts
+  const counts = {}
+  opTypes.forEach(t => {
+    counts[t.key] = allOps.filter(op => op.operation?.includes(t.key)).length
+  })
 
   return (
     <div className="card card-activity overflow-hidden">
       <div className="px-5 py-4 border-b border-shell-700 flex items-center justify-between">
-        <h2 className="font-display font-semibold text-white text-sm uppercase tracking-wide">File Operations</h2>
+        <h2 className="font-display font-semibold text-white text-sm uppercase tracking-wide">Operation Stats</h2>
         <span className="badge badge-info">{allOps.length} total</span>
       </div>
 
-      {/* Counters row */}
-      <div className="px-4 py-3 border-b border-shell-800 flex flex-wrap gap-3">
-        {Object.entries(counts).map(([type, count]) => {
-          if (count === 0) return null
-          const { text, label } = opColors[type]
-          return (
-            <div key={type} className="flex items-center gap-1.5 text-xs">
-              <span>{label}</span>
-              <span className={`font-mono font-bold ${text}`}>{count}</span>
-              <span className="text-shell-500">{type}</span>
-            </div>
-          )
-        })}
-      </div>
-
-      <div className="p-4 h-48 overflow-y-auto">
+      {/* Stats Grid */}
+      <div className="p-4">
         {allOps.length === 0 ? (
           <div className="text-shell-500 text-sm text-center py-8 font-mono">
             No operations yet
           </div>
         ) : (
-          allOps.slice(0, 12).map((op, i) => (
-            <div key={i} className="py-2 border-b border-shell-800 last:border-0">
-              <div className="flex items-center gap-2 text-xs">
-                <span className={`font-mono font-semibold ${
-                  op.operation?.includes('WRITE') ? 'text-neon-purple' :
-                  op.operation?.includes('EDIT') ? 'text-neon-pink' :
-                  op.operation?.includes('EXEC') ? 'text-neon-cyan' :
-                  op.operation?.includes('READ') ? 'text-neon-blue' : 'text-shell-400'
-                }`}>
-                  {op.operation?.replace(/^[^\w]*/, '').split(/\s/)[0] || 'OP'}
-                </span>
-                <span className="text-shell-500 font-mono">
-                  {op.timestamp ? new Date(op.timestamp).toLocaleTimeString('en-US', { hour12: false }) : ''}
-                </span>
-              </div>
-              <p className="text-xs text-shell-400 font-mono truncate mt-1">{op.path || 'unknown'}</p>
-            </div>
-          ))
+          <div className="grid grid-cols-3 gap-3">
+            {opTypes.map(({ key, label, icon, color, bg, border }) => {
+              const count = counts[key] || 0
+              if (count === 0) return null
+              return (
+                <div key={key} className={`${bg} ${border} border rounded-lg p-3 text-center`}>
+                  <div className="text-2xl mb-1">{icon}</div>
+                  <div className={`text-2xl font-bold font-mono ${color}`}>{count}</div>
+                  <div className="text-xs text-shell-400 uppercase tracking-wide">{label}</div>
+                </div>
+              )
+            })}
+          </div>
         )}
       </div>
     </div>
