@@ -1,12 +1,13 @@
 # MoltBot Guardian - Docker Compose
 # Usage: docker compose up -d
+# For full network visibility, use docker-compose.host.yml instead
 
 services:
   guardian:
-    image: ghcr.io/jfr992/moltbot-guardian:latest
+    build: .
+    image: moltbot-security-dashboard-guardian:latest
     container_name: moltbot-guardian
-    ports:
-      - "5050:5050"
+    network_mode: host
     volumes:
       - ~/.clawdbot:/data:ro
       - guardian-data:/home/moltbot
@@ -14,11 +15,11 @@ services:
       MOLTBOT_HOST: "0.0.0.0"
       MOLTBOT_PORT: "5050"
       CLAWDBOT_DIR: "/data"
+      # Required for gateway WebSocket connection
+      CLAWDBOT_API_TOKEN: "${CLAWDBOT_API_TOKEN}"
     restart: unless-stopped
     security_opt:
       - no-new-privileges:true
-    cap_drop:
-      - ALL
 
 volumes:
   guardian-data:

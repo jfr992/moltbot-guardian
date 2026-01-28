@@ -146,6 +146,20 @@ class SecurityDetector:
         # Record metric for OTEL
         record_alert(alert.severity, alert.category)
 
+    def create_alert(self, title: str, description: str, severity: str,
+                     category: str, details: dict = None) -> Optional[Alert]:
+        """Create and save a new alert."""
+        alert = Alert(
+            severity=severity,
+            category=category,
+            title=title,
+            description=description,
+            timestamp=datetime.now().isoformat(),
+            details=details or {}
+        )
+        self._save_alert(alert)
+        return alert
+
     def check_new_network_connections(self) -> List[Alert]:
         """Detect new outbound connections to unknown IPs."""
         alerts = []
