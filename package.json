@@ -1,5 +1,5 @@
 {
-  "name": "cangrejo-monitor",
+  "name": "openclaw-sentinel",
   "private": true,
   "version": "0.0.0",
   "type": "module",
@@ -33,5 +33,6 @@
     "tailwindcss": "^4.1.18",
     "vite": "^7.2.4",
     "vitest": "^4.0.18"
-  }
+  },
+  "description": "Agent Monitoring Dashboard for OpenClaw"
 }

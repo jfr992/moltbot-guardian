@@ -1,6 +1,6 @@
 @import "tailwindcss";
 
-/* Custom theme - Cangrejo Dark */
+/* OpenClaw Sentinel - Dark Theme */
 :root {
   --bg-primary: #0a0a0f;
   --bg-secondary: #12121a;
@@ -22,19 +22,36 @@ body {
   background: var(--bg-primary);
   color: var(--text-primary);
   font-family: 'Inter', system-ui, sans-serif;
+  min-height: 100vh;
+}
+
+/* Animated background gradient */
+body::before {
+  content: '';
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: 
+    radial-gradient(ellipse at 20% 20%, rgba(249, 115, 22, 0.08) 0%, transparent 50%),
+    radial-gradient(ellipse at 80% 80%, rgba(168, 85, 247, 0.06) 0%, transparent 50%),
+    radial-gradient(ellipse at 50% 50%, rgba(6, 182, 212, 0.04) 0%, transparent 70%);
+  pointer-events: none;
+  z-index: -1;
 }
 
 /* Scrollbar */
 ::-webkit-scrollbar {
-  width: 8px;
-  height: 8px;
+  width: 6px;
+  height: 6px;
 }
 ::-webkit-scrollbar-track {
   background: var(--bg-secondary);
 }
 ::-webkit-scrollbar-thumb {
   background: var(--border);
-  border-radius: 4px;
+  border-radius: 3px;
 }
 ::-webkit-scrollbar-thumb:hover {
   background: #3a3a4a;
@@ -44,6 +61,12 @@ body {
 @layer utilities {
   .card {
     @apply bg-[var(--bg-card)] border border-[var(--border)] rounded-xl;
+    backdrop-filter: blur(8px);
+    transition: all 0.3s ease;
+  }
+  .card:hover {
+    border-color: rgba(249, 115, 22, 0.3);
+    box-shadow: 0 4px 24px rgba(0, 0, 0, 0.3);
   }
   .glow-orange {
     box-shadow: 0 0 20px rgba(249, 115, 22, 0.3);
@@ -54,6 +77,9 @@ body {
   .glow-red {
     box-shadow: 0 0 20px rgba(239, 68, 68, 0.3);
   }
+  .glow-purple {
+    box-shadow: 0 0 20px rgba(168, 85, 247, 0.3);
+  }
   .metric-value {
     @apply text-3xl font-bold font-mono tracking-tight;
   }
@@ -62,11 +88,109 @@ body {
   }
 }
 
-/* Pulse animation for live indicators */
+/* Animations */
 @keyframes pulse-glow {
   0%, 100% { opacity: 1; }
   50% { opacity: 0.5; }
 }
+
+@keyframes float {
+  0%, 100% { transform: translateY(0px); }
+  50% { transform: translateY(-6px); }
+}
+
+@keyframes shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+
+@keyframes fade-in {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes scale-in {
+  from { opacity: 0; transform: scale(0.95); }
+  to { opacity: 1; transform: scale(1); }
+}
+
+@keyframes slide-up {
+  from { opacity: 0; transform: translateY(20px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
 .animate-pulse-glow {
   animation: pulse-glow 2s ease-in-out infinite;
+}
+
+.animate-float {
+  animation: float 3s ease-in-out infinite;
+}
+
+.animate-shimmer {
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,0.08), transparent);
+  background-size: 200% 100%;
+  animation: shimmer 2s infinite;
+}
+
+.animate-fade-in {
+  animation: fade-in 0.4s ease-out forwards;
+}
+
+.animate-scale-in {
+  animation: scale-in 0.3s ease-out forwards;
+}
+
+.animate-slide-up {
+  animation: slide-up 0.5s ease-out forwards;
+}
+
+/* Staggered animations for lists */
+.stagger-1 { animation-delay: 0.05s; }
+.stagger-2 { animation-delay: 0.1s; }
+.stagger-3 { animation-delay: 0.15s; }
+.stagger-4 { animation-delay: 0.2s; }
+.stagger-5 { animation-delay: 0.25s; }
+.stagger-6 { animation-delay: 0.3s; }
+
+/* Loading skeleton */
+.skeleton {
+  background: linear-gradient(90deg, var(--bg-secondary), var(--bg-card), var(--bg-secondary));
+  background-size: 200% 100%;
+  animation: shimmer 1.5s infinite;
+  border-radius: 4px;
+}
+
+/* Tab transitions */
+.tab-content {
+  animation: fade-in 0.3s ease-out;
+}
+
+/* Button hover effects */
+button {
+  transition: all 0.2s ease;
+}
+button:hover {
+  transform: translateY(-1px);
+}
+button:active {
+  transform: translateY(0);
+}
+
+/* Logo animation */
+.logo-bounce {
+  transition: transform 0.3s ease;
+}
+.logo-bounce:hover {
+  transform: scale(1.1) rotate(-5deg);
+}
+
+/* Gauge animations */
+.gauge-fill {
+  transition: stroke-dashoffset 1s ease-out;
+}
+
+/* Number counter animation */
+.counter-animate {
+  transition: all 0.5s ease-out;
 }

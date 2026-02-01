@@ -88,10 +88,10 @@ function App() {
       {/* Header */}
       <header className="flex items-center justify-between mb-6">
         <div className="flex items-center gap-3">
-          <span className="text-3xl md:text-4xl">🦀</span>
+          <span className="text-3xl md:text-4xl logo-bounce cursor-pointer">🦞</span>
           <div>
-            <h1 className="text-xl md:text-2xl font-bold text-[var(--accent-orange)]">Don Cangrejo Monitor</h1>
-            <p className="text-[var(--text-muted)] text-xs">Self-monitoring dashboard</p>
+            <h1 className="text-xl md:text-2xl font-bold bg-gradient-to-r from-[var(--accent-orange)] to-[var(--accent-amber)] bg-clip-text text-transparent">OpenClaw Sentinel</h1>
+            <p className="text-[var(--text-muted)] text-xs">Agent Monitoring Dashboard</p>
           </div>
         </div>
         <div className="flex items-center gap-2 md:gap-4">
@@ -280,7 +280,7 @@ function App() {
 
       {/* Footer */}
       <footer className="mt-6 md:mt-8 text-center text-[var(--text-muted)] text-xs">
-        Don Cangrejo Self-Monitor • Built with 🦀 and Recharts
+        OpenClaw Sentinel • Agent Monitoring Dashboard • Built with 🦞
       </footer>
     </div>
   )

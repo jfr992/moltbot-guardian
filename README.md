@@ -1,95 +1,157 @@
-# 🦀 Don Cangrejo Monitor
+# 🦞 OpenClaw Sentinel
 
-Self-monitoring dashboard for AI agent operations. Track usage, memory, performance, security, and insights.
+**Agent Monitoring Dashboard for OpenClaw**
+
+Real-time monitoring of your AI agent's usage, memory, performance, and security.
+
+![OpenClaw Sentinel](https://img.shields.io/badge/OpenClaw-Sentinel-orange?style=for-the-badge&logo=data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAxMDAgMTAwIj48dGV4dCB5PSIuOWVtIiBmb250LXNpemU9IjkwIj7wn6adPC90ZXh0Pjwvc3ZnPg==)
 
 ## Features
 
 | Tab | Description |
 |-----|-------------|
-| **Usage** | Token usage, cache efficiency, cost tracking, tool calls |
-| **Memory** | OpenClaw vector memory status via `openclaw memory status` |
-| **Performance** | Task completion, latency, tool reliability, error recovery |
-| **Security** | Risk assessment, threat detection, security alerts |
-| **Insights** | AI-generated analysis and recommendations |
+| 📊 **Usage** | Token usage, cache efficiency, cost tracking |
+| 🧠 **Memory** | Vector search status, indexed chunks, embeddings |
+| ⚡ **Performance** | Task completion, latency, tool reliability |
+| 🛡️ **Security** | Risk detection, threat alerts, exposure analysis |
+| 💡 **Insights** | AI-generated analysis and recommendations |
 
 ## Quick Start
 
+### One-Line Install
+
 ```bash
-npm install
-npm run dev     # Dev server with HMR
-npm start       # Production server
+curl -fsSL https://raw.githubusercontent.com/jfr992/openclaw-sentinel/main/install.sh | bash
 ```
 
-Dashboard: http://localhost:5055
+### Manual Install
+
+```bash
+# Clone
+git clone https://github.com/jfr992/openclaw-sentinel.git
+cd openclaw-sentinel
+
+# Install dependencies
+npm install
+
+# Start dashboard
+npm start
+```
+
+Dashboard opens at: **http://localhost:5055**
+
+## Requirements
+
+| Requirement | Required | Notes |
+|-------------|----------|-------|
+| Node.js 22+ | ✅ | Runtime |
+| OpenClaw | ✅ | For memory/session data |
+| Docker | Optional | For OTEL stack |
+
+### Platform Support
+
+| Platform | Status |
+|----------|--------|
+| macOS (arm64) | ✅ Tested |
+| macOS (x64) | ✅ Supported |
+| Ubuntu/Debian | ✅ Supported |
+| Other Linux | ✅ Supported |
+| Windows | ⚠️ Needs WSL |
+
+## Configuration
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `PORT` | 5055 | Dashboard port |
+| `OPENCLAW_DIR` | ~/.openclaw | OpenClaw data directory |
 
 ## Architecture
 
 ```
-cangrejo-monitor/
+openclaw-sentinel/
 ├── src/
-│   ├── App.jsx                    # Main app with tab navigation
+│   ├── App.jsx                    # Main dashboard
 │   ├── components/                # Shared UI components
-│   │   ├── MetricCard.jsx
-│   │   ├── TokenChart.jsx
-│   │   ├── CacheChart.jsx
-│   │   ├── CostChart.jsx
-│   │   ├── ToolCallsList.jsx
-│   │   └── SessionInfo.jsx
 │   └── features/                  # Feature modules
-│       ├── memory/                # OpenClaw memory integration
+│       ├── memory/                # OpenClaw memory status
 │       ├── performance/           # Performance metrics
-│       ├── security/              # Security dashboard
+│       ├── security/              # Security monitoring
 │       └── insights/              # AI insights
 ├── server/
 │   └── src/
-│       ├── domain/services/       # Metric calculators
+│       ├── domain/services/       # Metric calculators (12 services)
 │       └── interfaces/http/       # API routes
-├── server.js                      # Express + Vite server
-└── otel/                          # OpenTelemetry config (optional)
+└── server.js                      # Express + Vite server
 ```
 
 ## API Endpoints
 
 | Endpoint | Description |
 |----------|-------------|
-| `GET /api/usage` | Token usage from session JSONL files |
-| `GET /api/sessions` | Active sessions list |
-| `GET /api/health` | Server health check |
-| `GET /api/memory` | OpenClaw memory status (via CLI) |
-| `GET /api/performance/*` | Performance metrics (tasks, latency, tools, etc.) |
-| `GET /api/security/*` | Security risk assessment |
+| `GET /api/usage` | Token/cost metrics |
+| `GET /api/sessions` | Session list |
+| `GET /api/memory` | OpenClaw memory status |
+| `GET /api/performance/*` | Performance metrics |
+| `GET /api/security/*` | Security assessment |
+| `GET /api/health` | Health check |
 
-## Configuration
+## Optional: OTEL Stack
 
-| Variable | Default | Description |
-|----------|---------|-------------|
-| `PORT` | 5055 | Server port |
-| `OPENCLAW_DIR` | ~/.openclaw | OpenClaw data directory |
-| `GEMINI_API_KEY` | - | For OpenClaw memory (Gemini embeddings) |
+For traces and metrics collection:
 
-## Stack
+```bash
+cd otel
+docker compose up -d
+```
 
-- **Vite** — Fast dev experience
-- **React** — UI components  
-- **Tailwind CSS** — Styling
-- **Recharts** — Data visualization
-- **Lucide React** — Icons
-- **Express** — API server
+This starts:
+- **Prometheus** (port 9091) — Metrics storage
+- **Jaeger** (port 16686) — Traces UI
+- **OTEL Collector** (port 4318) — Telemetry receiver
+
+## Development
+
+```bash
+# Dev server with HMR
+npm run dev
+
+# Run tests (204 tests)
+npm test
+
+# Build for production
+npm run build
+
+# Lint
+npm run lint
+```
 
 ## Testing with Dagger
 
 ```bash
-# Run tests in containerized environment
-dagger call test
+# Run tests in container
+dagger call unit-test --source=.
 
-# Build container
-dagger call build
+# Full CI pipeline
+dagger call ci --source=.
 ```
 
-## Theme
+## Screenshots
 
-Dark mode with orange accents — matching the 🦀 aesthetic.
+### Usage Dashboard
+- Real-time token consumption
+- Cache hit ratio visualization
+- Cost tracking by day
+
+### Memory Dashboard
+- Vector search status (sqlite-vec)
+- Per-agent indexed files and chunks
+- Embedding provider info
+
+### Security Dashboard
+- Risk level gauge (0-4)
+- Alert feed with acknowledgment
+- Network exposure analysis
 
 ---
 
-Built by Don Cangrejo for Don Cangrejo 🦀
+Built with 🦞 for the OpenClaw community

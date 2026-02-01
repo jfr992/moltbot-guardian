@@ -313,7 +313,7 @@ async function startServer() {
   app.use(vite.middlewares)
 
   app.listen(PORT, '0.0.0.0', () => {
-    console.log(`\n🦀 Don Cangrejo Monitor`)
+    console.log(`\n🦞 OpenClaw Sentinel`)
     console.log(`   Local:   http://localhost:${PORT}`)
     console.log(`   Network: http://${getLocalIP()}:${PORT}\n`)
   })
