@@ -1,7 +1,8 @@
-import { LayoutDashboard, Bell, Globe, Folder, Settings, Shield, Lock } from 'lucide-react'
+import { LayoutDashboard, Bell, Globe, Folder, Settings, Shield, Lock, BarChart3 } from 'lucide-react'
 
 const navItems = [
   { id: 'all', icon: LayoutDashboard, label: 'Dashboard' },
+  { id: 'usage', icon: BarChart3, label: 'Usage' },
   { id: 'alerts', icon: Bell, label: 'Alerts' },
   { id: 'network', icon: Globe, label: 'Network' },
   { id: 'files', icon: Folder, label: 'Files' },

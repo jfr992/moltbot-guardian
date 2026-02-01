@@ -5,12 +5,13 @@ import MetricCards from './components/MetricCards'
 import ActivityLog from './components/ActivityLog'
 import AlertsPanel from './components/AlertsPanel'
 import NetworkPanel from './components/NetworkPanel'
+import UsagePanel from './components/UsagePanel'
 import SettingsModal from './components/SettingsModal'
 import PrivacyModal from './components/PrivacyModal'
 import { useActivity, useAlerts } from './hooks/useApi'
 
 // Valid view names for hash routing
-const VALID_VIEWS = ['all', 'alerts', 'network', 'files']
+const VALID_VIEWS = ['all', 'usage', 'alerts', 'network', 'files']
 
 // Get initial view from URL hash
 function getViewFromHash() {
@@ -93,6 +94,12 @@ export default function App() {
             {activeView === 'files' && (
               <div className="card card-activity glow-purple">
                 <ExpandedFileOps operations={data?.file_ops} />
+              </div>
+            )}
+
+            {activeView === 'usage' && (
+              <div className="card bg-shell-900/50 border-shell-700 p-6">
+                <UsagePanel expanded={true} />
               </div>
             )}
           </div>
