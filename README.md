@@ -1,26 +1,26 @@
-# 🦞 OpenClaw Sentinel
+# OpenClaw Sentinel
 
 **Monitor your AI agent's behavior, costs, and performance — all in one dashboard.**
 
-![Dashboard Preview](docs/images/dashboard-preview.png)
+![Dashboard Preview](docs/images/01-usage-tab.png)
 
 ---
 
 ## What is Sentinel?
 
-Sentinel watches over your OpenClaw AI agent and tells you:
+Sentinel watches over your OpenClaw AI agent and provides visibility into:
 
-- 💰 **How much you're spending** — Track tokens and costs by day
-- ⚡ **How well it's performing** — Task completion, response speed, tool reliability
-- 🧠 **How it's behaving** — Self-corrections, user sentiment, context health
-- 🔒 **If anything looks risky** — Security alerts for sensitive operations
-- 📊 **Memory usage** — Vector search stats and indexing status
+- **Spending** — Track tokens and costs by day
+- **Performance** — Task completion, response speed, tool reliability
+- **Behavior** — Self-corrections, user sentiment, context health
+- **Security** — Alerts for sensitive operations
+- **Memory** — Vector search stats and indexing status
 
 ---
 
 ## Quick Start
 
-### Option 1: Docker (Recommended)
+### Docker (Recommended)
 
 ```bash
 docker run -d \
@@ -35,9 +35,9 @@ docker run -d \
 
 Open **http://localhost:5056** in your browser.
 
-> **Note:** Replace `your-token-here` with your OpenClaw gateway token for real-time events.
+> Replace `your-token-here` with your OpenClaw gateway token for real-time events.
 
-### Option 2: Run Locally
+### Run Locally
 
 ```bash
 git clone https://github.com/jfr992/openclaw-sentinel.git
@@ -46,14 +46,12 @@ npm install
 npm start
 ```
 
-Open **http://localhost:5056** in your browser.
-
 ---
 
-## Features at a Glance
+## Features
 
-| Tab | What it Shows |
-|-----|---------------|
+| Tab | Description |
+|-----|-------------|
 | **Usage** | Tokens, costs, cache efficiency, daily trends |
 | **Memory** | Indexed files, chunks, vector search status |
 | **Performance** | Task completion %, response time, tool success rate |
@@ -96,25 +94,23 @@ Full OpenAPI 3.0 spec with Swagger UI at `/api/docs`.
 
 ---
 
-## The Dashboard
+## Controls
 
-### Header Controls
-
-- 🔄 **Refresh** — Manually refresh data
-- ⬆️ **Import** — Import historical data from session files
-- 🟢 **Online/Offline** — Gateway connection status
+### Header
+- **Refresh** — Manually refresh data
+- **Import** — Import historical data from session files
+- **Online/Offline** — Gateway connection status
 
 ### Multi-Agent Support
 
-When multiple agents are detected, an **Agent dropdown** appears in the control bar:
+When multiple agents are detected, an **Agent** dropdown appears in the control bar:
 
 - **All Agents** — Aggregate metrics across all agents (default)
 - **Select Agent** — Filter to see only that agent's data
 
 This works across all tabs and all metrics APIs via `?agent=<id>` parameter.
-- 🟢 **Online/Offline** — Gateway connection status
 
-### Date Range Picker
+### Date Range
 
 Select a time range to filter historical data:
 - **1H, 6H, 24H** — Short-term view
@@ -123,15 +119,15 @@ Select a time range to filter historical data:
 
 ---
 
-## Understanding the Metrics
+## Metrics Reference
 
-### Usage Tab
+### Usage
 - **Total Tokens** — Input + output tokens used
 - **Cache Hit** — % of requests served from cache (higher = cheaper)
 - **Total Cost** — Estimated spend in USD
 - **Messages** — Total conversation turns
 
-### Performance Tab
+### Performance
 - **Overall Score** — 0-100 rating of agent performance
 - **Task Completion** — % of tasks completed successfully
 - **Response Latency** — Average response time
@@ -139,12 +135,12 @@ Select a time range to filter historical data:
 - **Memory Retrieval** — How often memory is accessed
 - **Proactive Actions** — Self-initiated helpful actions
 
-### Insights Tab
+### Insights
 - **Self-Correction Score** — Lower is better (fewer mistakes)
 - **User Sentiment** — How satisfied users seem (from message tone)
 - **Context Health** — Conversation continuity (higher = fewer context losses)
 
-### Security Tab
+### Security
 - **Risk Level** — 0 (none) to 4 (critical)
 - **Alerts** — Suspicious operations detected
 - **Actions** — Acknowledge or dismiss alerts
@@ -154,9 +150,12 @@ Select a time range to filter historical data:
 ## Data Storage
 
 Sentinel stores metrics in a local SQLite database:
-- **Location**: `./data/metrics.db` (native) or `/app/data/metrics.db` (Docker)
-- **Retention**: 30 days by default
-- **Sync**: Every 5 minutes automatically
+
+| Setting | Value |
+|---------|-------|
+| Location | `./data/metrics.db` (native) or `/app/data/metrics.db` (Docker) |
+| Retention | 30 days |
+| Sync | Every 5 minutes (configurable via `SYNC_INTERVAL_MS`) |
 
 To persist data in Docker, use a volume:
 ```bash
@@ -165,34 +164,38 @@ To persist data in Docker, use a volume:
 
 ---
 
-## Importing Historical Data
+## Configuration
 
-Click the **⬆️ Import** button to re-sync all historical data from your OpenClaw session files. This is useful when:
-- First setting up Sentinel
-- After upgrading versions
-- If data seems incomplete
+| Environment Variable | Description | Default |
+|---------------------|-------------|---------|
+| `OPENCLAW_DIR` | Path to OpenClaw data | `~/.openclaw` |
+| `DATA_DIR` | Path to Sentinel data | `./data` |
+| `PORT` | Server port | `5056` |
+| `OPENCLAW_GATEWAY_URL` | Gateway WebSocket URL | `ws://127.0.0.1:18789` |
+| `OPENCLAW_GATEWAY_TOKEN` | Gateway auth token | — |
+| `SYNC_INTERVAL_MS` | Metrics sync interval | `300000` (5 min) |
+| `OTEL_ENABLED` | Enable OpenTelemetry | `false` |
 
 ---
 
 ## Troubleshooting
 
-### Dashboard shows "Offline"
+**Dashboard shows "Offline"**
 - Check if OpenClaw Gateway is running (`openclaw status`)
 - Verify the gateway URL and token in environment variables
 
-### Memory tab shows "Not Found"
+**Memory tab shows "Not Found"**
 - Ensure `~/.openclaw` is mounted in Docker
 - Check that OpenClaw has indexed some files
 
-### Metrics seem outdated
+**Metrics seem outdated**
 - Click the Refresh button
 - Or run Import to re-sync from session files
 
 ---
 
-## For Developers
+## Documentation
 
-See the [docs/](docs/) folder for:
 - [Architecture Overview](docs/ARCHITECTURE.md)
 - [API Reference](docs/API.md)
 - [Configuration Options](docs/CONFIGURATION.md)
@@ -202,8 +205,4 @@ See the [docs/](docs/) folder for:
 
 ## License
 
-MIT License — See [LICENSE](LICENSE) for details.
-
----
-
-Built with 🦞 by the OpenClaw community.
+MIT — See [LICENSE](LICENSE) for details.
