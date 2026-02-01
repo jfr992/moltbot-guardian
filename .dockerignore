@@ -3,7 +3,7 @@ node_modules/
 server/node_modules/
 
 # Build artifacts
-dist/
+# Note: dist/ is NOT ignored - we use pre-built frontend
 
 # Git
 .git/
@@ -43,9 +43,9 @@ scripts/gateway-probe.mjs
 .eslintrc*
 .prettier*
 eslint.config.js
-vite.config.js
 Makefile
 dagger.json
+# Note: vite.config.js MUST be included for Docker build to work correctly
 
 # OS files
 .DS_Store

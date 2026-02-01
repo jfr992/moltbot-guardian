@@ -1,5 +1,5 @@
 /**
- * Cangrejo Monitor Server
+ * OpenClaw Sentinel Server
  * Clean Architecture entry point
  */
 import express from 'express'
@@ -223,8 +223,124 @@ app.get('/api/health', (req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() })
 })
 
-// OpenClaw Memory Status (calls CLI)
+// Activity endpoint (for dashboard)
+app.get('/api/activity', async (req, res) => {
+  try {
+    const { toolCalls } = await parseSessionFiles()
+    
+    // Get recent tool calls as file operations
+    const fileOps = toolCalls
+      .filter(tc => ['read', 'write', 'edit', 'exec'].includes(tc.tool?.toLowerCase()))
+      .slice(0, 50)
+      .map(tc => ({
+        id: tc.id || `op-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+        type: tc.tool,
+        path: tc.args?.path || tc.args?.file_path || tc.args?.command || 'unknown',
+        timestamp: tc.timestamp,
+        risk: tc.risk || 'low'
+      }))
+    
+    // Get network connections (placeholder - would need actual network monitoring)
+    const connections = []
+    
+    res.json({
+      file_ops: fileOps,
+      tool_calls: toolCalls.slice(0, 50),
+      connections,
+      updated: new Date().toISOString()
+    })
+  } catch (err) {
+    res.status(500).json({ error: err.message })
+  }
+})
+
+// Alerts endpoint
+app.get('/api/alerts', (req, res) => {
+  const limit = parseInt(req.query.limit) || 50
+  res.json(alertStore.getRecent(limit))
+})
+
+// OpenClaw Memory Status (reads SQLite directly, falls back to CLI)
 app.get('/api/memory', async (req, res) => {
+  const memoryDir = path.join(openclawDir, 'memory')
+  
+  // Try to read SQLite databases directly (works in Docker with mounted volume)
+  try {
+    const dbFiles = await fs.promises.readdir(memoryDir).catch(() => [])
+    const sqliteFiles = dbFiles.filter(f => f.endsWith('.sqlite'))
+    
+    if (sqliteFiles.length > 0) {
+      const agents = []
+      let totalFiles = 0
+      let totalChunks = 0
+      let totalCache = 0
+      
+      for (const dbFile of sqliteFiles) {
+        const dbPath = path.join(memoryDir, dbFile)
+        const agentId = dbFile.replace('.sqlite', '')
+        
+        try {
+          // Use sqlite3 CLI to query (available in most containers)
+          const { stdout: filesOut } = await execAsync(
+            `sqlite3 "${dbPath}" "SELECT COUNT(*), COALESCE(SUM(size), 0) FROM files" 2>/dev/null`,
+            { timeout: 5000 }
+          ).catch(() => ({ stdout: '0|0' }))
+          
+          const { stdout: chunksOut } = await execAsync(
+            `sqlite3 "${dbPath}" "SELECT COUNT(*) FROM chunks" 2>/dev/null`,
+            { timeout: 5000 }
+          ).catch(() => ({ stdout: '0' }))
+          
+          const { stdout: cacheOut } = await execAsync(
+            `sqlite3 "${dbPath}" "SELECT COUNT(*) FROM embedding_cache" 2>/dev/null`,
+            { timeout: 5000 }
+          ).catch(() => ({ stdout: '0' }))
+          
+          const [fileCount, fileSize] = filesOut.trim().split('|').map(Number)
+          const chunkCount = parseInt(chunksOut.trim()) || 0
+          const cacheCount = parseInt(cacheOut.trim()) || 0
+          
+          totalFiles += fileCount || 0
+          totalChunks += chunkCount
+          totalCache += cacheCount
+          
+          agents.push({
+            id: agentId,
+            files: fileCount || 0,
+            fileSize: fileSize || 0,
+            chunks: chunkCount,
+            cache: { entries: cacheCount },
+            vector: { enabled: chunkCount > 0, available: chunkCount > 0, dims: 1536 },
+            fts: { enabled: true, available: true },
+            sources: [],
+            issues: []
+          })
+        } catch (dbErr) {
+          console.error(`Error reading ${dbFile}:`, dbErr.message)
+        }
+      }
+      
+      if (agents.length > 0) {
+        return res.json({
+          agents,
+          totals: {
+            agents: agents.length,
+            files: totalFiles,
+            chunks: totalChunks,
+            cacheEntries: totalCache,
+            vectorReady: totalChunks > 0,
+            ftsReady: true
+          },
+          timestamp: new Date().toISOString(),
+          source: 'sqlite'
+        })
+      }
+    }
+  } catch (sqliteErr) {
+    console.log('SQLite direct read failed, trying CLI:', sqliteErr.message)
+  }
+  
+  // Fallback: try CLI (works when running natively)
   try {
     const env = {
       ...process.env,
@@ -278,12 +394,23 @@ app.get('/api/memory', async (req, res) => {
       ftsReady: agents.every(a => a.fts.available)
     }
     
-    res.json({ agents, totals, timestamp: new Date().toISOString() })
+    res.json({ agents, totals, timestamp: new Date().toISOString(), source: 'cli' })
   } catch (err) {
     console.error('Memory API error:', err.message)
-    res.status(500).json({ 
-      error: err.message,
-      hint: 'Is openclaw CLI installed and in PATH?'
+    // Return a graceful response for Docker/environments without openclaw CLI
+    res.json({ 
+      agents: [],
+      totals: {
+        agents: 0,
+        files: 0,
+        chunks: 0,
+        cacheEntries: 0,
+        vectorReady: false,
+        ftsReady: false
+      },
+      timestamp: new Date().toISOString(),
+      unavailable: true,
+      message: 'Memory databases not found. Mount ~/.openclaw to /data or run natively.'
     })
   }
 })
@@ -564,6 +691,15 @@ app.get('/api/live/stats', (req, res) => {
   })
 })
 
+// API: Gateway status (for frontend connection indicator)
+app.get('/api/gateway/status', (req, res) => {
+  res.json({
+    connected: gatewayClient.connected,
+    url: gatewayClient.url,
+    reconnects: gatewayClient.reconnectAttempts || 0
+  })
+})
+
 // API: Baseline status
 app.get('/api/baseline/status', (req, res) => {
   res.json(baselineLearner.getStatus())
@@ -623,7 +759,8 @@ gatewayClient.connect()
 const clientDist = path.join(process.cwd(), 'dist')
 if (fs.existsSync(clientDist)) {
   app.use(express.static(clientDist))
-  app.get('/{*splat}', (req, res) => {
+  // Express 5 requires named params for wildcards
+  app.get('/{*path}', (req, res) => {
     res.sendFile(path.join(clientDist, 'index.html'))
   })
 }
@@ -646,7 +783,7 @@ function getLocalIP() {
 
 server.listen(PORT, '0.0.0.0', () => {
   console.log(`
-🦀 Don Cangrejo Monitor
+🦞 OpenClaw Sentinel
    Local:   http://localhost:${PORT}
    Network: http://${getLocalIP()}:${PORT}
    

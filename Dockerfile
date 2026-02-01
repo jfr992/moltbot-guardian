@@ -36,11 +36,11 @@ WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
 COPY --from=deps /app/server/node_modules ./server/node_modules
 
-# Copy source
+# Copy source (including pre-built dist/)
 COPY . .
 
-# Build frontend
-RUN npm run build
+# Build frontend (skip if dist/ already exists from host)
+RUN if [ ! -f dist/index.html ]; then npm run build; fi
 
 # Prune dev dependencies
 RUN npm prune --omit=dev && \
@@ -71,8 +71,8 @@ COPY --from=builder --chown=sentinel:sentinel /app/package.json ./
 # Create data directory for baseline storage
 RUN mkdir -p /app/data && chown sentinel:sentinel /app/data
 
-# Security: Remove unnecessary packages and shells
-RUN apk --no-cache add --virtual .run-deps wget && \
+# Add runtime dependencies (wget for healthcheck, sqlite for memory reading)
+RUN apk --no-cache add wget sqlite && \
     rm -rf /var/cache/apk/* /tmp/* /root/.npm /root/.node-gyp
 
 # Switch to non-root user
