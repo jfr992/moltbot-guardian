@@ -12,7 +12,7 @@
 import { dag, Container, Directory, object, func } from "@dagger.io/dagger"
 
 @object()
-export class CangrejoMonitor {
+export class OpenclawSentinel {
   /**
    * Get a Node.js container with the project source mounted
    */
@@ -122,9 +122,7 @@ export class CangrejoMonitor {
   @func()
   async docker(source: Directory): Promise<string> {
     // Build the Docker image using the project's Dockerfile
-    const image = dag
-      .container()
-      .build(source, { dockerfile: "Dockerfile", target: "production" })
+    const image = source.dockerBuild({ dockerfile: "Dockerfile", target: "production" })
 
     // Test the image
     const result = await image
@@ -149,9 +147,7 @@ export class CangrejoMonitor {
    */
   @func()
   image(source: Directory): Container {
-    return dag
-      .container()
-      .build(source, { dockerfile: "Dockerfile", target: "production" })
+    return source.dockerBuild({ dockerfile: "Dockerfile", target: "production" })
   }
 
   /**
