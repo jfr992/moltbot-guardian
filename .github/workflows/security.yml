@@ -3,6 +3,10 @@ name: Security Scan
 on:
   pull_request:
     branches: [main]
+  push:
+    branches: [main]
+  schedule:
+    - cron: '0 6 * * 1'  # Weekly on Monday
 
 jobs:
   security:
@@ -12,39 +16,45 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.11'
-
-      - name: Install security tools
-        run: |
-          pip install bandit pip-audit
-
-      - name: Run Bandit (Python SAST)
-        run: |
-          bandit -r dashboard/ -ll -ii --exclude "*/venv/*,*/test_*" -f json -o bandit-report.json || true
-          bandit -r dashboard/ -ll -ii --exclude "*/venv/*,*/test_*"
-
-      - name: Check Python dependencies
-        run: |
-          cd dashboard
-          pip-audit -r requirements.txt || true
-
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: '22'
+          cache: 'npm'
 
-      - name: Audit npm packages
+      - name: Install dependencies
         run: |
-          cd dashboard-ui
           npm ci
-          npm audit --audit-level=high || true
+          cd server && npm ci
 
-      - name: Upload Bandit report
-        uses: actions/upload-artifact@v4
-        if: always()
-        with:
-          name: bandit-report
-          path: bandit-report.json
+      - name: Audit npm packages (frontend)
+        run: npm audit --audit-level=high || true
+
+      - name: Audit npm packages (server)
+        run: cd server && npm audit --audit-level=high || true
+
+      - name: Run Gitleaks
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Check for hardcoded secrets
+        run: |
+          echo "🔍 Checking for potential secrets..."
+          # Check for common secret patterns
+          if grep -rn --include="*.js" --include="*.jsx" --include="*.ts" \
+            -E "(password|secret|api_key|apikey|token)\s*[:=]\s*['\"][^'\"]{8,}" \
+            --exclude-dir=node_modules . 2>/dev/null; then
+            echo "⚠️ Potential hardcoded secrets found - review above"
+          else
+            echo "✅ No obvious hardcoded secrets"
+          fi
+
+      - name: Check for console.log in production
+        run: |
+          echo "🔍 Checking for console.log statements..."
+          if grep -rn "console\.log" src/ --include="*.jsx" --include="*.js" 2>/dev/null | grep -v "// ok" | head -20; then
+            echo "⚠️ console.log found - consider removing for production"
+          else
+            echo "✅ No console.log in src/"
+          fi

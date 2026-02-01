@@ -1,4 +1,4 @@
-# MoltBot Guardian Pre-commit Hooks
+# OpenClaw Sentinel Pre-commit Hooks
 # Security-focused hooks to prevent leaks and vulnerabilities
 
 repos:
@@ -20,44 +20,6 @@ repos:
         name: "🕵️ Detect-secrets - Find high entropy strings"
         args: ['--baseline', '.secrets.baseline']
         exclude: package-lock.json
-
-  # =============================================================================
-  # PYTHON SECURITY SCANNING
-  # =============================================================================
-
-  - repo: https://github.com/PyCQA/bandit
-    rev: 1.8.3
-    hooks:
-      - id: bandit
-        name: "🐍 Bandit - Python security linter"
-        # -ll = severity MEDIUM+ (matches CI workflow), -i = confidence LOW+
-        # Low-severity issues (B404/B110/B603/B105) are acceptable patterns
-        args: ["-ll", "-i", "-x", "*/tests/*,*/venv/*,*/.venv/*"]
-        files: ^dashboard/.*\.py$
-
-  # Safety check as local hook (pyupio/safety repo doesn't have pre-commit hooks)
-  - repo: local
-    hooks:
-      - id: safety-check
-        name: "🛡️ Safety - Check Python dependencies"
-        entry: bash -c 'pip3 install -q safety && safety check -r requirements.txt --full-report || true'
-        language: system
-        files: requirements\.txt$
-        pass_filenames: false
-
-  # =============================================================================
-  # UNIT TESTS - Run before every commit
-  # =============================================================================
-
-  - repo: local
-    hooks:
-      - id: pytest
-        name: "🧪 Pytest - Run unit tests"
-        entry: bash -c 'cd dashboard && pip3 install -q pytest pytest-mock && python3 -m pytest tests/ -v --tb=short'
-        language: system
-        files: ^dashboard/.*\.py$
-        pass_filenames: false
-        always_run: true
 
   # =============================================================================
   # GENERAL CODE QUALITY
@@ -104,17 +66,25 @@ repos:
     hooks:
       - id: npm-audit
         name: "📦 NPM Audit - JS vulnerabilities"
-        entry: bash -c 'cd dashboard-ui && npm audit --audit-level=high || true'
+        entry: bash -c 'npm audit --audit-level=high || true'
         language: system
         files: package\.json$
         pass_filenames: false
 
       - id: eslint
         name: "📝 ESLint - JavaScript linter"
-        entry: bash -c 'cd dashboard-ui && npm run lint --if-present || echo "⚠️ ESLint has warnings - see output above"'
+        entry: bash -c 'npm run lint || echo "⚠️ ESLint has issues - see output above"'
         language: system
-        files: ^dashboard-ui/.*\.(js|jsx)$
+        files: \.(js|jsx)$
         pass_filenames: false
+
+      - id: vitest
+        name: "🧪 Vitest - Run unit tests"
+        entry: bash -c 'npm test'
+        language: system
+        files: \.(js|jsx)$
+        pass_filenames: false
+        stages: [pre-push]
 
   # =============================================================================
   # DOCKERFILE SECURITY
@@ -125,7 +95,7 @@ repos:
     hooks:
       - id: hadolint-docker
         name: "🐳 Hadolint - Dockerfile linter"
-        args: ["--ignore", "DL3008", "--ignore", "DL3013"]
+        args: ["--ignore", "DL3008", "--ignore", "DL3016"]
 
   # =============================================================================
   # CUSTOM SECURITY CHECKS
@@ -135,13 +105,13 @@ repos:
     hooks:
       - id: no-hardcoded-ips
         name: "🌐 Check for hardcoded IPs"
-        entry: bash -c 'grep -rn --include="*.py" --include="*.js" --include="*.jsx" "([0-9]{1,3}\.){3}[0-9]{1,3}" --exclude-dir=node_modules --exclude-dir=venv --exclude-dir=dist . | grep -v "127.0.0.1" | grep -v "0.0.0.0" | grep -v "localhost" && exit 1 || exit 0'
+        entry: bash -c 'grep -rn --include="*.js" --include="*.jsx" "([0-9]{1,3}\.){3}[0-9]{1,3}" --exclude-dir=node_modules --exclude-dir=dist . | grep -v "127.0.0.1" | grep -v "0.0.0.0" | grep -v "localhost" && exit 1 || exit 0'
         language: system
         pass_filenames: false
 
       - id: no-console-logs
         name: "🖨️ Check for console.log in production"
-        entry: bash -c 'grep -rn "console\.log" dashboard-ui/src/ --include="*.jsx" --include="*.js" | grep -v "// ok" && exit 1 || exit 0'
+        entry: bash -c 'grep -rn "console\.log" src/ --include="*.jsx" --include="*.js" | grep -v "// ok" && exit 1 || exit 0'
         language: system
         pass_filenames: false
 

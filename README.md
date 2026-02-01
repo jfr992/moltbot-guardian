@@ -1,185 +1,232 @@
-<div align="center">
+# 🦞 OpenClaw Sentinel
 
-# 🦀 MoltBot Guardian
+**Agent Monitoring Dashboard for OpenClaw**
 
-**Real-time security monitoring for AI agent operations**
+Real-time monitoring of your AI agent's usage, memory, performance, and security.
 
-[![CI](https://github.com/jfr992/moltbot-guardian/actions/workflows/ci.yml/badge.svg)](https://github.com/jfr992/moltbot-guardian/actions/workflows/ci.yml)
-[![Docker](https://img.shields.io/badge/docker-ghcr.io-blue.svg)](https://github.com/jfr992/moltbot-guardian/pkgs/container/moltbot-guardian)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+[![CI](https://github.com/jfr992/openclaw-sentinel/actions/workflows/ci.yml/badge.svg)](https://github.com/jfr992/openclaw-sentinel/actions/workflows/ci.yml)
+[![Security](https://github.com/jfr992/openclaw-sentinel/actions/workflows/security.yml/badge.svg)](https://github.com/jfr992/openclaw-sentinel/actions/workflows/security.yml)
+[![Docker](https://github.com/jfr992/openclaw-sentinel/actions/workflows/docker.yml/badge.svg)](https://github.com/jfr992/openclaw-sentinel/actions/workflows/docker.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
-![MoltBot Guardian Dashboard](docs/screenshot.png)
+![OpenClaw Sentinel](https://img.shields.io/badge/OpenClaw-Sentinel-orange?style=for-the-badge&logo=data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAxMDAgMTAwIj48dGV4dCB5PSIuOWVtIiBmb250LXNpemU9IjkwIj7wn6adPC90ZXh0Pjwvc3ZnPg==)
 
-</div>
+## Features
 
----
+| Tab | Description |
+|-----|-------------|
+| 📊 **Usage** | Token usage, cache efficiency, cost tracking |
+| 🧠 **Memory** | Vector search status, indexed chunks, embeddings |
+| ⚡ **Performance** | Task completion, latency, tool reliability |
+| 🛡️ **Security** | Risk detection, threat alerts, exposure analysis |
+| 💡 **Insights** | AI-generated analysis and recommendations |
+| 🔴 **Live Feed** | Real-time agent activity via OpenClaw Gateway WebSocket |
 
-## What is this?
+### Live Feed (NEW)
 
-A **security monitoring layer** for [MoltBot](https://github.com/moltbot/moltbot) AI agents. It watches what your agents do and alerts you to suspicious activity.
+Real-time streaming of agent activity directly from the OpenClaw Gateway:
 
-**This is NOT MoltBot itself** — it's a companion tool that monitors MoltBot operations.
+- **Live token streaming** — Watch responses generate in real-time
+- **Tool call tracking** — See every tool invocation as it happens
+- **Run lifecycle** — Track active and completed agent runs
+- **Risk alerts** — Instant security notifications on suspicious commands
 
----
+Requires OpenClaw Gateway running (default: `ws://127.0.0.1:18789`).
 
-## ✨ Features
+## Quick Start
 
-| Feature | Description |
-|---------|-------------|
-| **🚨 Security Alerts** | Detects reverse shells, data exfiltration, privilege escalation |
-| **⚡ Kill Session** | One-click termination of suspicious agent sessions |
-| **🌐 Network Monitor** | Real-time connections with threat detection (50+ domains, 30+ ports) |
-| **📊 Operation Stats** | Counters by type: Read, Write, Edit, Exec, Message, Browser |
-| **📝 Activity Log** | Real-time feed of all tool calls with timestamps |
-| **🧠 Baseline Learning** | Learns normal patterns, flags anomalies |
-| **🔐 Local Only** | No external data transmission |
+### One-Line Install
 
----
-
-## 🚀 Quick Start
+```bash
+curl -fsSL https://raw.githubusercontent.com/jfr992/openclaw-sentinel/main/install.sh | bash
+```
 
 ### Docker (Recommended)
 
 ```bash
-# Get your MoltBot gateway token
-TOKEN=$(jq -r '.gateway.auth.token' ~/.moltbot/moltbot.json)
+# Clone
+git clone https://github.com/jfr992/openclaw-sentinel.git
+cd openclaw-sentinel
 
-# Run Guardian
-docker run -d --name guardian \
-  -p 5050:5050 \
-  -v ~/.moltbot:/data \
-  -e MOLTBOT_API_TOKEN="$TOKEN" \
-  ghcr.io/jfr992/moltbot-guardian:latest
+# Configure
+cp .env.example .env
+# Edit .env with your gateway token:
+# OPENCLAW_GATEWAY_TOKEN=$(jq -r '.gateway.auth.token' ~/.openclaw/openclaw.json)
+
+# Run
+docker compose up -d
 ```
 
-**Dashboard:** http://localhost:5050
+Dashboard opens at: **http://localhost:5056**
 
-### From Source
+### Manual Install
 
 ```bash
-git clone https://github.com/jfr992/moltbot-guardian.git
-cd moltbot-guardian
-./dev.sh setup
-./dev.sh start
+# Clone
+git clone https://github.com/jfr992/openclaw-sentinel.git
+cd openclaw-sentinel
+
+# Install dependencies
+npm install
+
+# Start dashboard (dev mode)
+npm start
 ```
 
----
+Dashboard opens at: **http://localhost:5055** (dev) or **5056** (production)
 
-## ⚙️ Configuration
+## Requirements
+
+| Requirement | Required | Notes |
+|-------------|----------|-------|
+| Node.js 22+ | ✅ | Runtime |
+| OpenClaw | ✅ | For memory/session data |
+| Docker | Optional | For OTEL stack |
+
+### Platform Support
+
+| Platform | Status |
+|----------|--------|
+| macOS (arm64) | ✅ Tested |
+| macOS (x64) | ✅ Supported |
+| Ubuntu/Debian | ✅ Supported |
+| Other Linux | ✅ Supported |
+| Windows | ⚠️ Needs WSL |
+
+## Configuration
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `MOLTBOT_PORT` | `5050` | Dashboard port |
-| `MOLTBOT_DIR` | `~/.moltbot` | Agent session logs location |
-| `MOLTBOT_API_TOKEN` | - | Gateway token (for kill functionality) |
+| `PORT` | 5055 | Dashboard port |
+| `OPENCLAW_DIR` | ~/.openclaw | OpenClaw data directory |
+| `OPENCLAW_GATEWAY_URL` | ws://127.0.0.1:18789 | Gateway WebSocket URL |
+| `OPENCLAW_GATEWAY_TOKEN` | — | Gateway auth token (if required) |
 
----
+## Architecture
 
-## 📈 Observability (OpenTelemetry)
+```
+openclaw-sentinel/
+├── src/
+│   ├── App.jsx                    # Main dashboard
+│   ├── components/                # Shared UI components
+│   └── features/                  # Feature modules
+│       ├── memory/                # OpenClaw memory status
+│       ├── performance/           # Performance metrics
+│       ├── security/              # Security monitoring
+│       └── insights/              # AI insights
+├── server/
+│   └── src/
+│       ├── domain/services/       # Metric calculators (13 services)
+│       │   ├── LiveFeed.js        # Real-time event processing
+│       │   ├── RiskScorer.js      # Security analysis
+│       │   └── ...                # Other trackers
+│       ├── infrastructure/
+│       │   └── OpenClawGatewayClient.js  # Gateway WebSocket client
+│       └── interfaces/http/       # API routes
+└── server.js                      # Express + Vite server
 
-Guardian can visualize **Clawdbot's native OTEL metrics** via a bundled collector stack.
-
-### Quick Start
-
-**1. Enable OTEL in Clawdbot** (`~/.clawdbot/clawdbot.json`):
-
-```json
-{
-  "diagnostics": {
-    "otel": {
-      "enabled": true,
-      "endpoint": "http://localhost:4317",
-      "protocol": "grpc",
-      "serviceName": "clawdbot",
-      "traces": true,
-      "metrics": true,
-      "logs": true
-    }
-  }
-}
+Data Flow:
+┌─────────────────┐         ┌──────────────────┐         ┌──────────────┐
+│  OpenClaw       │  ──WS→  │  Sentinel        │  ──WS→  │  Dashboard   │
+│  Gateway:18789  │         │  Server:5056     │         │  (React)     │
+│  (agent events) │         │  (LiveFeed)      │         │              │
+└─────────────────┘         └──────────────────┘         └──────────────┘
 ```
 
-**2. Start the collector stack:**
+## API Endpoints
+
+| Endpoint | Description |
+|----------|-------------|
+| `GET /api/usage` | Token/cost metrics |
+| `GET /api/sessions` | Session list |
+| `GET /api/memory` | OpenClaw memory status |
+| `GET /api/performance/*` | Performance metrics |
+| `GET /api/security/*` | Security assessment |
+| `GET /api/live/stats` | Live feed + gateway stats |
+| `GET /api/live/events` | Recent activity, runs |
+| `GET /api/health` | Health check |
+
+### WebSocket Endpoints
+
+| Endpoint | Description |
+|----------|-------------|
+| `ws://host:port/ws/live` | Real-time agent activity stream |
+| `ws://host:port/ws/security` | Security alerts |
+
+#### `/ws/live` Events
+
+```js
+// Initial snapshot on connect
+{ type: 'snapshot', data: { recentEvents, activeRuns, completedRuns, stats } }
+
+// Real-time activity
+{ type: 'activity', data: { type: 'agent', runId, stream, delta, ... } }
+
+// Run lifecycle
+{ type: 'run:start', data: { runId, sessionKey, startedAt } }
+{ type: 'run:complete', data: { runId, durationMs, toolCalls, risks } }
+
+// Security alerts
+{ type: 'risk:alert', data: { runId, toolCall, risk: { level, type, match } } }
+```
+
+## Optional: OTEL Stack
+
+For traces and metrics collection:
 
 ```bash
-docker-compose -f docker-compose.yml -f docker-compose.otel.yaml up -d
+cd otel
+docker compose up -d
 ```
 
-**3. Restart Clawdbot** to apply config:
+This starts:
+- **Prometheus** (port 9091) — Metrics storage
+- **Jaeger** (port 16686) — Traces UI
+- **OTEL Collector** (port 4318) — Telemetry receiver
+
+## Development
 
 ```bash
-clawdbot gateway restart
+# Dev server with HMR
+npm run dev
+
+# Run tests (230 tests)
+npm test
+
+# Build for production
+npm run build
+
+# Lint
+npm run lint
 ```
 
-### Dashboards
+## Testing with Dagger
 
-| Service | URL | Credentials |
-|---------|-----|-------------|
-| Guardian | http://localhost:5050 | — |
-| Grafana | http://localhost:3000 | admin / guardian |
-| Prometheus | http://localhost:9090 | — |
+```bash
+# Run tests in container
+dagger call unit-test --source=.
 
-### Clawdbot Metrics
-
-Clawdbot exports these via OTEL when enabled:
-
-| Metric | Description |
-|--------|-------------|
-| `clawdbot.tokens.input` | Input tokens by model |
-| `clawdbot.tokens.output` | Output tokens by model |
-| `clawdbot.cost.total` | API cost in USD |
-| `clawdbot.requests.total` | Total API requests |
-| `clawdbot.requests.duration` | Request latency histogram |
-| `clawdbot.tool_calls` | Tool invocations by name |
-| `clawdbot.sessions.active` | Active session count |
-
-### Custom OTEL Backend
-
-Point Clawdbot to any OTLP-compatible backend:
-
-```json
-{
-  "diagnostics": {
-    "otel": {
-      "enabled": true,
-      "endpoint": "https://otlp.your-provider.com:4317",
-      "headers": { "Authorization": "Bearer <token>" }
-    }
-  }
-}
+# Full CI pipeline
+dagger call ci --source=.
 ```
 
-Supports: Grafana Cloud, Datadog, Honeycomb, Jaeger, SigNoz, etc.
+## Screenshots
+
+### Usage Dashboard
+- Real-time token consumption
+- Cache hit ratio visualization
+- Cost tracking by day
+
+### Memory Dashboard
+- Vector search status (sqlite-vec)
+- Per-agent indexed files and chunks
+- Embedding provider info
+
+### Security Dashboard
+- Risk level gauge (0-4)
+- Alert feed with acknowledgment
+- Network exposure analysis
 
 ---
 
-## 🏗️ Architecture
-
-```
-┌─────────────────────────────────────────────────┐
-│              MoltBot Guardian                    │
-├─────────────────────────────────────────────────┤
-│  React Dashboard    │  Flask API + SocketIO     │
-│  ├─ Metrics         │  ├─ Session parser        │
-│  ├─ Activity Log    │  ├─ Security detector     │
-│  ├─ Alerts          │  ├─ Threat intelligence   │
-│  ├─ Network         │  └─ Gateway WebSocket     │
-│  └─ Operation Stats │                           │
-├─────────────────────────────────────────────────┤
-│  ~/.moltbot/agents/*.jsonl (session logs)       │
-└─────────────────────────────────────────────────┘
-```
-
----
-
-## 📜 License
-
-MIT — See [LICENSE](LICENSE)
-
----
-
-<div align="center">
-
-**A security layer for MoltBot** 🦀 by [@jfr992](https://github.com/jfr992)
-
-</div>
+Built with 🦞 for the OpenClaw community

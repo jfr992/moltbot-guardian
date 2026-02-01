@@ -1,0 +1,52 @@
+# Dependencies
+node_modules/
+server/node_modules/
+
+# Build artifacts
+dist/
+
+# Git
+.git/
+.github/
+.gitignore
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Logs
+*.log
+npm-debug.log*
+
+# Environment
+.env
+.env.*
+!.env.example
+
+# Tests
+coverage/
+**/*.test.js
+**/tests/
+
+# Development
+.dagger/
+otel/
+scripts/gateway-probe.mjs
+
+# Documentation
+*.md
+!README.md
+
+# Config files not needed in image
+.eslintrc*
+.prettier*
+eslint.config.js
+vite.config.js
+Makefile
+dagger.json
+
+# OS files
+.DS_Store
+Thumbs.db
