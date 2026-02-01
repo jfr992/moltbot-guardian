@@ -104,6 +104,16 @@ Full OpenAPI 3.0 spec with Swagger UI at `/api/docs`.
 - ⬆️ **Import** — Import historical data from session files
 - 🟢 **Online/Offline** — Gateway connection status
 
+### Multi-Agent Support
+
+When multiple agents are detected, an **Agent dropdown** appears in the control bar:
+
+- **All Agents** — Aggregate metrics across all agents (default)
+- **Select Agent** — Filter to see only that agent's data
+
+This works across all tabs and all metrics APIs via `?agent=<id>` parameter.
+- 🟢 **Online/Offline** — Gateway connection status
+
 ### Date Range Picker
 
 Select a time range to filter historical data:
