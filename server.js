@@ -11,6 +11,8 @@ import os from 'os'
 import { exec } from 'child_process'
 import { promisify } from 'util'
 import performanceRoutes from './server/src/interfaces/http/routes/performance.js'
+import insightsRoutes from './server/src/interfaces/http/routes/insights.js'
+import securityRoutes from './server/src/interfaces/http/routes/security.js'
 
 const execAsync = promisify(exec)
 
@@ -52,8 +54,63 @@ async function getSessionData() {
 // Inject getSessionData into app.locals for performance routes
 app.locals.getSessionData = getSessionData
 
-// Mount performance routes
+// Helper: Get recent tool calls for security routes
+async function getRecentToolCalls(limit = 100) {
+  const { messages } = await getSessionData()
+  const toolCalls = []
+  
+  for (const msg of messages) {
+    if (Array.isArray(msg.content)) {
+      for (const item of msg.content) {
+        if (item.type === 'toolCall' && item.name) {
+          toolCalls.push({
+            name: item.name,
+            arguments: item.arguments || {},
+            timestamp: msg.timestamp || msg._timestamp,
+            id: item.id
+          })
+        }
+      }
+    }
+  }
+  
+  // Sort by timestamp desc, return most recent
+  return toolCalls
+    .sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0))
+    .slice(0, limit)
+}
+app.locals.getRecentToolCalls = getRecentToolCalls
+
+// Helper: Get user messages for insights
+async function getUserMessages(limit = 100) {
+  const { messages } = await getSessionData()
+  return messages
+    .filter(m => m.role === 'user')
+    .slice(-limit)
+}
+app.locals.getUserMessages = getUserMessages
+
+// Helper: Get context data for insights
+async function getContextData() {
+  const { messages } = await getSessionData()
+  const assistantMsgs = messages.filter(m => m.role === 'assistant')
+  return {
+    totalMessages: messages.length,
+    assistantMessages: assistantMsgs.length,
+    avgResponseLength: assistantMsgs.reduce((sum, m) => {
+      const text = Array.isArray(m.content) 
+        ? m.content.filter(c => c.type === 'text').map(c => c.text).join('')
+        : (m.content || '')
+      return sum + text.length
+    }, 0) / (assistantMsgs.length || 1)
+  }
+}
+app.locals.getContextData = getContextData
+
+// Mount API routes
 app.use('/api/performance', performanceRoutes)
+app.use('/api/insights', insightsRoutes)
+app.use('/api/security', securityRoutes)
 
 // Jaeger API proxy (for traces tab)
 const JAEGER_URL = process.env.JAEGER_URL || 'http://localhost:16686'
