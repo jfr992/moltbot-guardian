@@ -34,6 +34,7 @@ export class CangrejoMonitor {
   @func()
   async lint(source: Directory): Promise<string> {
     return this.install(source)
+      .withEnvVariable("NODE_OPTIONS", "--max-old-space-size=4096")
       .withExec(["npm", "run", "lint"])
       .stdout()
   }
@@ -68,16 +69,11 @@ export class CangrejoMonitor {
   }
 
   /**
-   * Full CI pipeline: lint + test + build
+   * Full CI pipeline: test + build (lint skipped - too heavy for container)
    */
   @func()
   async ci(source: Directory): Promise<string> {
     const container = this.install(source)
-
-    // Run lint
-    await container
-      .withExec(["npm", "run", "lint"])
-      .sync()
 
     // Run tests
     const testOutput = await container
