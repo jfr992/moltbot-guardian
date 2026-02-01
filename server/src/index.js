@@ -223,6 +223,43 @@ app.get('/api/health', (req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() })
 })
 
+// Activity endpoint (for dashboard)
+app.get('/api/activity', async (req, res) => {
+  try {
+    const { toolCalls } = await parseSessionFiles()
+    
+    // Get recent tool calls as file operations
+    const fileOps = toolCalls
+      .filter(tc => ['read', 'write', 'edit', 'exec'].includes(tc.tool?.toLowerCase()))
+      .slice(0, 50)
+      .map(tc => ({
+        id: tc.id || `op-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+        type: tc.tool,
+        path: tc.args?.path || tc.args?.file_path || tc.args?.command || 'unknown',
+        timestamp: tc.timestamp,
+        risk: tc.risk || 'low'
+      }))
+    
+    // Get network connections (placeholder - would need actual network monitoring)
+    const connections = []
+    
+    res.json({
+      file_ops: fileOps,
+      tool_calls: toolCalls.slice(0, 50),
+      connections,
+      updated: new Date().toISOString()
+    })
+  } catch (err) {
+    res.status(500).json({ error: err.message })
+  }
+})
+
+// Alerts endpoint
+app.get('/api/alerts', (req, res) => {
+  const limit = parseInt(req.query.limit) || 50
+  res.json(alertStore.getRecent(limit))
+})
+
 // OpenClaw Memory Status (calls CLI)
 app.get('/api/memory', async (req, res) => {
   try {
@@ -561,6 +598,15 @@ app.get('/api/live/stats', (req, res) => {
     gateway: gatewayClient.getStats(),
     feed: liveFeed.getStats(),
     clients: liveClients.size
+  })
+})
+
+// API: Gateway status (for frontend connection indicator)
+app.get('/api/gateway/status', (req, res) => {
+  res.json({
+    connected: gatewayClient.connected,
+    url: gatewayClient.url,
+    reconnects: gatewayClient.reconnectAttempts || 0
   })
 })
 

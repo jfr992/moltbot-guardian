@@ -36,11 +36,11 @@ WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
 COPY --from=deps /app/server/node_modules ./server/node_modules
 
-# Copy source
+# Copy source (including pre-built dist/)
 COPY . .
 
-# Build frontend
-RUN npm run build
+# Build frontend (skip if dist/ already exists from host)
+RUN if [ ! -f dist/index.html ]; then npm run build; fi
 
 # Prune dev dependencies
 RUN npm prune --omit=dev && \
