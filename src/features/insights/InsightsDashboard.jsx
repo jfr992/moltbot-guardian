@@ -1,0 +1,276 @@
+import { useState, useEffect, useCallback } from 'react'
+import { Brain, MessageCircle, TrendingUp, TrendingDown, Minus, RefreshCw, AlertCircle, CheckCircle, Target } from 'lucide-react'
+
+export default function InsightsDashboard() {
+  const [summary, setSummary] = useState(null)
+  const [corrections, setCorrections] = useState(null)
+  const [sentiment, setSentiment] = useState(null)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState(null)
+
+  const fetchData = useCallback(async () => {
+    try {
+      const [summaryRes, correctionsRes, sentimentRes] = await Promise.all([
+        fetch('/api/insights/summary'),
+        fetch('/api/insights/corrections'),
+        fetch('/api/insights/sentiment')
+      ])
+
+      if (summaryRes.ok) setSummary(await summaryRes.json())
+      if (correctionsRes.ok) setCorrections(await correctionsRes.json())
+      if (sentimentRes.ok) setSentiment(await sentimentRes.json())
+      
+      setError(null)
+    } catch (err) {
+      setError(err.message)
+    } finally {
+      setLoading(false)
+    }
+  }, [])
+
+  useEffect(() => {
+    fetchData()
+    const interval = setInterval(fetchData, 30000) // Every 30s
+    return () => clearInterval(interval)
+  }, [fetchData])
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <div className="text-center">
+          <Brain className="w-12 h-12 text-[var(--accent-purple)] mx-auto mb-2 animate-pulse" />
+          <p className="text-[var(--text-muted)]">Analyzing behavior...</p>
+        </div>
+      </div>
+    )
+  }
+
+  const TrendIcon = sentiment?.trend === 'improving' ? TrendingUp :
+                    sentiment?.trend === 'declining' ? TrendingDown : Minus
+
+  return (
+    <div className="space-y-6">
+      {/* Header */}
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-3">
+          <Brain className="w-6 h-6 text-[var(--accent-purple)]" />
+          <h2 className="text-xl font-bold">Self-Insights</h2>
+        </div>
+        <button
+          onClick={fetchData}
+          className="p-2 rounded-lg bg-[var(--bg-secondary)] hover:bg-[var(--border)] transition-colors"
+        >
+          <RefreshCw className="w-4 h-4" />
+        </button>
+      </div>
+
+      {error && (
+        <div className="card p-4 border-[var(--accent-red)] bg-red-500/10">
+          <div className="flex items-center gap-2 text-[var(--accent-red)]">
+            <AlertCircle className="w-4 h-4" />
+            <span>{error}</span>
+          </div>
+        </div>
+      )}
+
+      {/* Health Score */}
+      {summary && (
+        <div className="card p-6">
+          <div className="flex items-center justify-between">
+            <div>
+              <h3 className="text-sm font-semibold text-[var(--text-secondary)] mb-2">Overall Health</h3>
+              <div className="flex items-center gap-3">
+                <span className="text-4xl font-bold" style={{ 
+                  color: summary.status.color === 'green' ? 'var(--accent-green)' :
+                         summary.status.color === 'blue' ? 'var(--accent-blue)' :
+                         summary.status.color === 'yellow' ? 'var(--accent-amber)' :
+                         summary.status.color === 'orange' ? 'var(--accent-orange)' :
+                         'var(--accent-red)'
+                }}>
+                  {summary.healthScore}
+                </span>
+                <div>
+                  <span className="text-2xl">{summary.status.emoji}</span>
+                  <p className="text-sm text-[var(--text-muted)]">{summary.status.label}</p>
+                </div>
+              </div>
+            </div>
+            <div className="text-right">
+              <p className="text-xs text-[var(--text-muted)]">Based on</p>
+              <p className="text-sm">Corrections + Sentiment</p>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Two Column Layout */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* Self-Correction */}
+        <div className="card p-6">
+          <h3 className="text-sm font-semibold text-[var(--text-secondary)] mb-4 flex items-center gap-2">
+            <Target className="w-4 h-4 text-[var(--accent-orange)]" />
+            Self-Correction Score
+          </h3>
+          
+          {corrections && (
+            <div className="space-y-4">
+              {/* Score Display */}
+              <div className="flex items-end gap-4">
+                <span className={`text-5xl font-bold ${
+                  corrections.score === 0 ? 'text-[var(--accent-green)]' :
+                  corrections.score < 30 ? 'text-[var(--accent-blue)]' :
+                  corrections.score < 60 ? 'text-[var(--accent-amber)]' :
+                  'text-[var(--accent-red)]'
+                }`}>
+                  {corrections.score}
+                </span>
+                <span className="text-[var(--text-muted)] mb-2">/ 100</span>
+              </div>
+              
+              <p className="text-sm text-[var(--text-secondary)]">
+                {corrections.interpretation}
+              </p>
+              
+              {/* Breakdown */}
+              <div className="grid grid-cols-2 gap-2 text-sm">
+                <div className="p-2 rounded bg-[var(--bg-secondary)]">
+                  <span className="text-[var(--text-muted)]">Verbal</span>
+                  <span className="float-right font-mono">{corrections.byType.verbal}</span>
+                </div>
+                <div className="p-2 rounded bg-[var(--bg-secondary)]">
+                  <span className="text-[var(--text-muted)]">Tool Retry</span>
+                  <span className="float-right font-mono">{corrections.byType.toolRetry}</span>
+                </div>
+                <div className="p-2 rounded bg-[var(--bg-secondary)]">
+                  <span className="text-[var(--text-muted)]">File Re-edit</span>
+                  <span className="float-right font-mono">{corrections.byType.fileReedit}</span>
+                </div>
+                <div className="p-2 rounded bg-[var(--bg-secondary)]">
+                  <span className="text-[var(--text-muted)]">Error Recovery</span>
+                  <span className="float-right font-mono">{corrections.byType.errorRecovery}</span>
+                </div>
+              </div>
+              
+              {/* Recommendation */}
+              <div className="p-3 rounded-lg bg-[var(--accent-orange)]/10 border border-[var(--accent-orange)]/30">
+                <p className="text-sm text-[var(--accent-orange)]">
+                  💡 {corrections.recommendation}
+                </p>
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* User Sentiment */}
+        <div className="card p-6">
+          <h3 className="text-sm font-semibold text-[var(--text-secondary)] mb-4 flex items-center gap-2">
+            <MessageCircle className="w-4 h-4 text-[var(--accent-cyan)]" />
+            User Sentiment
+          </h3>
+          
+          {sentiment && (
+            <div className="space-y-4">
+              {/* Feedback Score */}
+              <div className="flex items-end gap-4">
+                <span className={`text-5xl font-bold ${
+                  sentiment.feedbackScore >= 70 ? 'text-[var(--accent-green)]' :
+                  sentiment.feedbackScore >= 50 ? 'text-[var(--accent-blue)]' :
+                  sentiment.feedbackScore >= 30 ? 'text-[var(--accent-amber)]' :
+                  'text-[var(--accent-red)]'
+                }`}>
+                  {sentiment.feedbackScore}
+                </span>
+                <span className="text-[var(--text-muted)] mb-2">/ 100</span>
+              </div>
+              
+              {/* Trend */}
+              <div className="flex items-center gap-2">
+                <TrendIcon className={`w-5 h-5 ${
+                  sentiment.trend === 'improving' ? 'text-[var(--accent-green)]' :
+                  sentiment.trend === 'declining' ? 'text-[var(--accent-red)]' :
+                  'text-[var(--text-muted)]'
+                }`} />
+                <span className="text-sm capitalize">{sentiment.trend}</span>
+                <span className="text-xs text-[var(--text-muted)]">
+                  ({sentiment.totalMessages} messages)
+                </span>
+              </div>
+              
+              {/* Distribution */}
+              <div className="space-y-2">
+                <div className="flex items-center gap-2">
+                  <div className="flex-1 h-3 bg-[var(--bg-secondary)] rounded-full overflow-hidden flex">
+                    <div 
+                      className="h-full bg-[var(--accent-green)]" 
+                      style={{ width: `${sentiment.satisfactionRate}%` }}
+                    />
+                    <div 
+                      className="h-full bg-[var(--accent-red)]" 
+                      style={{ width: `${sentiment.frustrationRate}%` }}
+                    />
+                  </div>
+                </div>
+                <div className="flex justify-between text-xs">
+                  <span className="text-[var(--accent-green)]">
+                    {sentiment.satisfactionRate}% satisfied
+                  </span>
+                  <span className="text-[var(--accent-red)]">
+                    {sentiment.frustrationRate}% frustrated
+                  </span>
+                </div>
+              </div>
+              
+              {/* Recent Sentiment */}
+              <div className="flex items-center gap-2 p-2 rounded bg-[var(--bg-secondary)]">
+                <span className="text-xs text-[var(--text-muted)]">Recent:</span>
+                {sentiment.recentSentiment === 'positive' ? (
+                  <><CheckCircle className="w-4 h-4 text-[var(--accent-green)]" /> <span className="text-sm text-[var(--accent-green)]">Positive</span></>
+                ) : sentiment.recentSentiment === 'negative' ? (
+                  <><AlertCircle className="w-4 h-4 text-[var(--accent-red)]" /> <span className="text-sm text-[var(--accent-red)]">Negative</span></>
+                ) : (
+                  <><Minus className="w-4 h-4 text-[var(--text-muted)]" /> <span className="text-sm text-[var(--text-muted)]">Neutral</span></>
+                )}
+              </div>
+              
+              {/* Recommendation */}
+              <div className="p-3 rounded-lg bg-[var(--accent-cyan)]/10 border border-[var(--accent-cyan)]/30">
+                <p className="text-sm text-[var(--accent-cyan)]">
+                  💬 {sentiment.recommendation}
+                </p>
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Recent Corrections Detail */}
+      {corrections?.recentCorrections?.length > 0 && (
+        <div className="card p-6">
+          <h3 className="text-sm font-semibold text-[var(--text-secondary)] mb-4">
+            Recent Corrections
+          </h3>
+          <div className="space-y-2 max-h-48 overflow-y-auto">
+            {corrections.recentCorrections.map((c, i) => (
+              <div key={i} className="flex items-center gap-2 p-2 rounded bg-[var(--bg-secondary)]">
+                <span className={`text-xs px-2 py-0.5 rounded ${
+                  c.type === 'verbal' ? 'bg-blue-500/20 text-blue-400' :
+                  c.type === 'tool_retry' ? 'bg-orange-500/20 text-orange-400' :
+                  c.type === 'file_reedit' ? 'bg-purple-500/20 text-purple-400' :
+                  'bg-red-500/20 text-red-400'
+                }`}>
+                  {c.type.replace('_', ' ')}
+                </span>
+                <span className="text-sm text-[var(--text-secondary)] truncate flex-1">
+                  {c.match || c.path || c.tool || 'Unknown'}
+                </span>
+                <span className="text-xs text-[var(--text-muted)]">
+                  {Math.round(c.confidence * 100)}%
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}

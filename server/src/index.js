@@ -11,6 +11,7 @@ import { glob } from 'glob'
 import fs from 'fs'
 
 import securityRoutes, { alertStore } from './interfaces/http/routes/security.js'
+import insightsRoutes from './interfaces/http/routes/insights.js'
 import { aggregateUsage } from './domain/services/UsageCalculator.js'
 import { scoreToolCall, RISK_LEVELS } from './domain/services/RiskScorer.js'
 
@@ -81,8 +82,69 @@ async function getRecentToolCalls(limit = 100) {
     .slice(0, limit)
 }
 
-// Make helper available to routes
+// Helper to get session data for insights
+async function getSessionData() {
+  const { messages, toolCalls } = await parseSessionFiles()
+  
+  // Extract assistant text content
+  const assistantTexts = []
+  for (const msg of messages) {
+    if (msg.role === 'assistant' && typeof msg.content === 'string') {
+      assistantTexts.push(msg.content)
+    }
+  }
+  
+  return { messages, toolCalls, assistantTexts }
+}
+
+// Helper to get user messages for sentiment analysis
+async function getUserMessages() {
+  const files = await glob(sessionsPattern)
+  const userMessages = []
+  
+  for (const file of files) {
+    try {
+      const content = fs.readFileSync(file, 'utf-8')
+      const lines = content.trim().split('\n').filter(Boolean)
+      
+      for (const line of lines) {
+        try {
+          const entry = JSON.parse(line)
+          const msg = entry.message || {}
+          
+          if (msg.role === 'user' && msg.content) {
+            // Extract text content
+            let text = ''
+            if (typeof msg.content === 'string') {
+              text = msg.content
+            } else if (Array.isArray(msg.content)) {
+              text = msg.content
+                .filter(c => c.type === 'text')
+                .map(c => c.text)
+                .join(' ')
+            }
+            
+            if (text) {
+              userMessages.push({
+                text,
+                timestamp: entry.timestamp
+              })
+            }
+          }
+        } catch { /* skip */ }
+      }
+    } catch { /* skip */ }
+  }
+  
+  return userMessages.sort((a, b) => 
+    (a.timestamp || '').localeCompare(b.timestamp || '')
+  )
+}
+
+// Make helpers available to routes
 app.locals.getRecentToolCalls = getRecentToolCalls
+app.locals.getSessionData = getSessionData
+app.locals.getUserMessages = getUserMessages
 
 // ============================================
 // API Routes
@@ -142,6 +204,9 @@ app.get('/api/sessions', async (req, res) => {
 
 // Security routes
 app.use('/api/security', securityRoutes)
+
+// Insights routes (self-correction, sentiment)
+app.use('/api/insights', insightsRoutes)
 
 // ============================================
 // WebSocket: Real-time Security Alerts
