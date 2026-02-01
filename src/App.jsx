@@ -8,6 +8,7 @@ import ToolCallsList from './components/ToolCallsList'
 import SessionInfo from './components/SessionInfo'
 import SecurityDashboard from './features/security/SecurityDashboard'
 import InsightsDashboard from './features/insights/InsightsDashboard'
+import { PerformanceDashboard } from './features/performance'
 
 function App() {
   const [activeTab, setActiveTab] = useState('usage')
@@ -75,6 +76,7 @@ function App() {
   // Tab configuration
   const tabs = [
     { id: 'usage', label: 'Usage', icon: BarChart3 },
+    { id: 'performance', label: 'Performance', icon: Activity },
     { id: 'security', label: 'Security', icon: Shield, badge: riskLevel > 0 ? riskLevel : null },
     { id: 'insights', label: 'Insights', icon: Brain }
   ]
@@ -256,6 +258,10 @@ function App() {
             </div>
           </div>
         </>
+      )}
+
+      {activeTab === 'performance' && (
+        <PerformanceDashboard />
       )}
 
       {activeTab === 'security' && (

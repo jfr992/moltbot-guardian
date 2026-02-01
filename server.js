@@ -8,6 +8,7 @@ import fs from 'fs'
 import path from 'path'
 import { glob } from 'glob'
 import os from 'os'
+import performanceRoutes from './server/src/interfaces/http/routes/performance.js'
 
 const app = express()
 const PORT = 5055
@@ -15,6 +16,40 @@ const PORT = 5055
 // Find OpenClaw config directory
 const openclawDir = process.env.OPENCLAW_DIR || path.join(os.homedir(), '.openclaw')
 const sessionsPattern = path.join(openclawDir, 'agents', '*', 'sessions', '*.jsonl')
+
+// Helper: Parse all session messages (used by performance routes)
+async function getSessionData() {
+  const files = await glob(sessionsPattern)
+  const messages = []
+  
+  for (const file of files) {
+    try {
+      const content = fs.readFileSync(file, 'utf-8')
+      const lines = content.trim().split('\n').filter(Boolean)
+      
+      for (const line of lines) {
+        try {
+          const entry = JSON.parse(line)
+          const msg = entry.message || {}
+          msg._timestamp = entry.timestamp
+          messages.push(msg)
+        } catch (e) {
+          // Skip malformed lines
+        }
+      }
+    } catch (e) {
+      // Skip unreadable files
+    }
+  }
+  
+  return { messages }
+}
+
+// Inject getSessionData into app.locals for performance routes
+app.locals.getSessionData = getSessionData
+
+// Mount performance routes
+app.use('/api/performance', performanceRoutes)
 
 // API: Get usage stats from session files
 app.get('/api/usage', async (req, res) => {

@@ -32,7 +32,7 @@ export function calculateLatency(start, end) {
  * @returns {'simple'|'moderate'|'complex'}
  */
 export function estimateComplexity(text, toolCalls = 0) {
-  if (!text) return 'simple';
+  if (!text || typeof text !== 'string') return 'simple';
   
   const wordCount = text.split(/\s+/).length;
   const hasCode = /```/.test(text);
