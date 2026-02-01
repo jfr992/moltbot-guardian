@@ -9,12 +9,19 @@ import path from 'path'
 import os from 'os'
 import { glob } from 'glob'
 import fs from 'fs'
+import { exec } from 'child_process'
+import { promisify } from 'util'
+
+const execAsync = promisify(exec)
 
 import securityRoutes, { alertStore } from './interfaces/http/routes/security.js'
 import insightsRoutes from './interfaces/http/routes/insights.js'
 import performanceRoutes from './interfaces/http/routes/performance.js'
 import { aggregateUsage } from './domain/services/UsageCalculator.js'
 import { scoreToolCall, RISK_LEVELS } from './domain/services/RiskScorer.js'
+import { OpenClawGatewayClient } from './infrastructure/OpenClawGatewayClient.js'
+import { LiveFeed } from './domain/services/LiveFeed.js'
+import { BaselineLearner } from './domain/services/BaselineLearner.js'
 
 const app = express()
 const PORT = process.env.PORT || 5056
@@ -216,6 +223,71 @@ app.get('/api/health', (req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() })
 })
 
+// OpenClaw Memory Status (calls CLI)
+app.get('/api/memory', async (req, res) => {
+  try {
+    const env = {
+      ...process.env,
+      GEMINI_API_KEY: process.env.GEMINI_API_KEY,
+      OPENAI_API_KEY: '' // Force Gemini
+    }
+    
+    const { stdout } = await execAsync('openclaw memory status --json 2>/dev/null', {
+      env,
+      timeout: 15000
+    })
+    
+    // Extract JSON from output (skip doctor warnings)
+    const jsonStart = stdout.indexOf('[')
+    const jsonEnd = stdout.lastIndexOf(']') + 1
+    if (jsonStart === -1 || jsonEnd === 0) {
+      throw new Error('No JSON in output')
+    }
+    const jsonStr = stdout.slice(jsonStart, jsonEnd)
+    const data = JSON.parse(jsonStr)
+    
+    // Transform to simpler format
+    const agents = data.map(agent => ({
+      id: agent.agentId,
+      files: agent.status?.files || 0,
+      chunks: agent.status?.chunks || 0,
+      provider: agent.status?.provider || 'unknown',
+      model: agent.status?.model || 'unknown',
+      dirty: agent.status?.dirty || false,
+      cache: agent.status?.cache || {},
+      vector: {
+        enabled: agent.status?.vector?.enabled || false,
+        available: agent.status?.vector?.available || false,
+        dims: agent.status?.vector?.dims || 0
+      },
+      fts: {
+        enabled: agent.status?.fts?.enabled || false,
+        available: agent.status?.fts?.available || false
+      },
+      batch: agent.status?.batch || {},
+      sources: agent.status?.sourceCounts || [],
+      issues: agent.scan?.issues || []
+    }))
+    
+    const totals = {
+      agents: agents.length,
+      files: agents.reduce((sum, a) => sum + a.files, 0),
+      chunks: agents.reduce((sum, a) => sum + a.chunks, 0),
+      cacheEntries: agents.reduce((sum, a) => sum + (a.cache?.entries || 0), 0),
+      vectorReady: agents.every(a => a.vector.available),
+      ftsReady: agents.every(a => a.fts.available)
+    }
+    
+    res.json({ agents, totals, timestamp: new Date().toISOString() })
+  } catch (err) {
+    console.error('Memory API error:', err.message)
+    res.status(500).json({ 
+      error: err.message,
+      hint: 'Is openclaw CLI installed and in PATH?'
+    })
+  }
+})
+
 // Usage stats (from domain service)
 app.get('/api/usage', async (req, res) => {
   try {
@@ -277,37 +349,79 @@ app.use('/api/performance', performanceRoutes)
 // ============================================
 
 const server = createServer(app)
-const wss = new WebSocketServer({ server, path: '/ws/security' })
+
+// Single WebSocketServer, handle paths manually
+const wss = new WebSocketServer({ noServer: true })
+
+// Handle upgrade requests
+server.on('upgrade', (request, socket, head) => {
+  const pathname = new URL(request.url, `http://${request.headers.host}`).pathname
+  
+  if (pathname === '/ws/security' || pathname === '/ws/live') {
+    wss.handleUpgrade(request, socket, head, (ws) => {
+      ws._path = pathname
+      wss.emit('connection', ws, request)
+    })
+  } else {
+    socket.destroy()
+  }
+})
 
 const wsClients = new Set()
+const liveClients = new Set()
 
-wss.on('connection', (ws) => {
-  console.log('[WS] Client connected')
-  wsClients.add(ws)
+wss.on('connection', (ws, request) => {
+  const pathname = ws._path || new URL(request.url, `http://${request.headers.host}`).pathname
   
-  // Send current risk level on connect
-  getRecentToolCalls(100).then(toolCalls => {
-    const { scoreToolCall, calculateSessionRisk } = require('./domain/services/RiskScorer.js')
-    const assessment = calculateSessionRisk(toolCalls)
+  if (pathname === '/ws/security') {
+    // Security WebSocket handler
+    console.log('[WS Security] Client connected')
+    wsClients.add(ws)
+    
+    // Send current risk level on connect
+    getRecentToolCalls(100).then(toolCalls => {
+      const { calculateSessionRisk } = require('./domain/services/RiskScorer.js')
+      const assessment = calculateSessionRisk(toolCalls)
+      ws.send(JSON.stringify({
+        type: 'risk_update',
+        data: {
+          level: assessment.level,
+          levelName: assessment.levelName,
+          totalRisks: assessment.totalRisks
+        }
+      }))
+    }).catch(() => {})
+    
+    ws.on('close', () => {
+      wsClients.delete(ws)
+      console.log('[WS Security] Client disconnected')
+    })
+    
+    ws.on('error', (err) => {
+      console.error('[WS Security] Error:', err.message)
+      wsClients.delete(ws)
+    })
+  } else if (pathname === '/ws/live') {
+    // Live feed WebSocket handler
+    console.log('[WS Live] Client connected')
+    liveClients.add(ws)
+    
+    // Send initial snapshot
     ws.send(JSON.stringify({
-      type: 'risk_update',
-      data: {
-        level: assessment.level,
-        levelName: assessment.levelName,
-        totalRisks: assessment.totalRisks
-      }
+      type: 'snapshot',
+      data: liveFeed.getSnapshot()
     }))
-  }).catch(() => {})
-  
-  ws.on('close', () => {
-    wsClients.delete(ws)
-    console.log('[WS] Client disconnected')
-  })
-  
-  ws.on('error', (err) => {
-    console.error('[WS] Error:', err.message)
-    wsClients.delete(ws)
-  })
+    
+    ws.on('close', () => {
+      liveClients.delete(ws)
+      console.log('[WS Live] Client disconnected')
+    })
+    
+    ws.on('error', (err) => {
+      console.error('[WS Live] Error:', err.message)
+      liveClients.delete(ws)
+    })
+  }
 })
 
 // Broadcast to all connected clients
@@ -371,13 +485,145 @@ async function checkForNewRisks() {
 setInterval(checkForNewRisks, 5000)
 
 // ============================================
+// WebSocket: Live Feed (OpenClaw Gateway Relay)
+// ============================================
+
+const liveFeed = new LiveFeed()
+const baselineLearner = new BaselineLearner()
+
+// Train baseline from live feed tool calls
+liveFeed.on('activity', (event) => {
+  if (event.tool) {
+    baselineLearner.recordToolCall({
+      name: event.tool,
+      arguments: event.toolInput
+    })
+  }
+})
+
+// OpenClaw Gateway Client
+const gatewayClient = new OpenClawGatewayClient({
+  url: process.env.OPENCLAW_GATEWAY_URL || 'ws://127.0.0.1:18789',
+  token: process.env.OPENCLAW_GATEWAY_TOKEN
+})
+
+gatewayClient.on('connected', ({ protocol, snapshot }) => {
+  console.log(`[Gateway] Connected (protocol v${protocol})`)
+  if (snapshot?.presence) {
+    console.log(`[Gateway] Presence: ${snapshot.presence.length} clients`)
+  }
+})
+
+gatewayClient.on('disconnected', ({ code, reason }) => {
+  console.log(`[Gateway] Disconnected (${code}): ${reason}`)
+})
+
+gatewayClient.on('error', (err) => {
+  console.error(`[Gateway] Error: ${err.message}`)
+})
+
+gatewayClient.on('event', (eventData) => {
+  // Process through LiveFeed
+  liveFeed.processEvent(eventData)
+})
+
+// LiveFeed broadcasts to /ws/live clients
+liveFeed.on('activity', (event) => {
+  broadcastLive({ type: 'activity', data: event })
+})
+
+liveFeed.on('run:start', (run) => {
+  broadcastLive({ type: 'run:start', data: run })
+})
+
+liveFeed.on('run:complete', (run) => {
+  broadcastLive({ type: 'run:complete', data: run })
+})
+
+liveFeed.on('risk:alert', (alert) => {
+  broadcastLive({ type: 'risk:alert', data: alert })
+  // Also broadcast to security clients
+  broadcastAlert(alert)
+})
+
+function broadcastLive(message) {
+  const json = JSON.stringify(message)
+  for (const client of liveClients) {
+    if (client.readyState === 1) {
+      client.send(json)
+    }
+  }
+}
+
+// API: Live feed stats
+app.get('/api/live/stats', (req, res) => {
+  res.json({
+    gateway: gatewayClient.getStats(),
+    feed: liveFeed.getStats(),
+    clients: liveClients.size
+  })
+})
+
+// API: Baseline status
+app.get('/api/baseline/status', (req, res) => {
+  res.json(baselineLearner.getStatus())
+})
+
+// API: Baseline top patterns
+app.get('/api/baseline/patterns', (req, res) => {
+  const limit = parseInt(req.query.limit) || 10
+  res.json(baselineLearner.getTopPatterns(limit))
+})
+
+// API: Check if tool call is anomaly
+app.post('/api/baseline/check', express.json(), (req, res) => {
+  const result = baselineLearner.isAnomaly(req.body)
+  res.json(result)
+})
+
+// API: Whitelist a command/path/tool
+app.post('/api/baseline/whitelist', express.json(), (req, res) => {
+  const { type, value } = req.body
+  if (!type || !value) {
+    return res.status(400).json({ error: 'type and value required' })
+  }
+  const success = baselineLearner.whitelist(type, value)
+  res.json({ success, message: success ? 'Added to whitelist' : 'Invalid type or already whitelisted' })
+})
+
+// API: Update baseline config
+app.patch('/api/baseline/config', express.json(), (req, res) => {
+  baselineLearner.updateConfig(req.body)
+  res.json({ success: true, config: baselineLearner.getStatus().config })
+})
+
+// API: Reset baseline learning
+app.post('/api/baseline/reset', (req, res) => {
+  baselineLearner.reset()
+  res.json({ success: true, message: 'Baseline reset, learning restarted' })
+})
+
+// API: Recent activity
+app.get('/api/live/events', (req, res) => {
+  const limit = parseInt(req.query.limit) || 100
+  res.json({
+    events: liveFeed.getRecentEvents(limit),
+    activeRuns: liveFeed.getActiveRuns(),
+    completedRuns: liveFeed.getCompletedRuns(20)
+  })
+})
+
+// Start gateway connection
+gatewayClient.connect()
+
+// ============================================
 // Static files (Vite build)
 // ============================================
 
 const clientDist = path.join(process.cwd(), 'dist')
 if (fs.existsSync(clientDist)) {
   app.use(express.static(clientDist))
-  app.get('*', (req, res) => {
+  app.get('/{*splat}', (req, res) => {
     res.sendFile(path.join(clientDist, 'index.html'))
   })
 }
@@ -403,6 +649,11 @@ server.listen(PORT, '0.0.0.0', () => {
 🦀 Don Cangrejo Monitor
    Local:   http://localhost:${PORT}
    Network: http://${getLocalIP()}:${PORT}
-   WebSocket: ws://localhost:${PORT}/ws/security
+   
+   WebSocket endpoints:
+   • /ws/live     — Real-time agent activity (via OpenClaw Gateway)
+   • /ws/security — Security alerts
+   
+   Gateway: ${gatewayClient.url}
 `)
 })

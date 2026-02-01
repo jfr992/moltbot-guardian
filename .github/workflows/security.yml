@@ -1,0 +1,60 @@
+name: Security Scan
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+  schedule:
+    - cron: '0 6 * * 1'  # Weekly on Monday
+
+jobs:
+  security:
+    name: Security Checks
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: |
+          npm ci
+          cd server && npm ci
+
+      - name: Audit npm packages (frontend)
+        run: npm audit --audit-level=high || true
+
+      - name: Audit npm packages (server)
+        run: cd server && npm audit --audit-level=high || true
+
+      - name: Run Gitleaks
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Check for hardcoded secrets
+        run: |
+          echo "🔍 Checking for potential secrets..."
+          # Check for common secret patterns
+          if grep -rn --include="*.js" --include="*.jsx" --include="*.ts" \
+            -E "(password|secret|api_key|apikey|token)\s*[:=]\s*['\"][^'\"]{8,}" \
+            --exclude-dir=node_modules . 2>/dev/null; then
+            echo "⚠️ Potential hardcoded secrets found - review above"
+          else
+            echo "✅ No obvious hardcoded secrets"
+          fi
+
+      - name: Check for console.log in production
+        run: |
+          echo "🔍 Checking for console.log statements..."
+          if grep -rn "console\.log" src/ --include="*.jsx" --include="*.js" 2>/dev/null | grep -v "// ok" | head -20; then
+            echo "⚠️ console.log found - consider removing for production"
+          else
+            echo "✅ No console.log in src/"
+          fi

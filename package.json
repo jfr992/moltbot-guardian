@@ -1,7 +1,13 @@
 {
   "name": "openclaw-sentinel",
-  "private": true,
-  "version": "0.0.0",
+  "private": false,
+  "version": "1.0.0",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/jfr992/openclaw-sentinel.git"
+  },
+  "author": "Juan Felipe Reyes Marlés",
+  "license": "MIT",
   "type": "module",
   "scripts": {
     "dev": "vite --host",
@@ -32,7 +38,8 @@
     "globals": "^16.5.0",
     "tailwindcss": "^4.1.18",
     "vite": "^7.2.4",
-    "vitest": "^4.0.18"
+    "vitest": "^4.0.18",
+    "ws": "^8.19.0"
   },
   "description": "Agent Monitoring Dashboard for OpenClaw"
 }

@@ -1,0 +1,129 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  security-gate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: |
+          npm ci
+          cd server && npm ci
+
+      - name: Security audit
+        run: |
+          echo "🔍 Running security audit..."
+          npm audit --audit-level=high
+          cd server && npm audit --audit-level=high
+          echo "✅ Security audit passed"
+
+      - name: Run tests
+        run: |
+          npm test
+          cd server && npm test
+          echo "✅ All tests passed"
+
+  build-docker:
+    needs: security-gate
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ghcr.io/${{ github.repository }}
+          tags: |
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=sha,prefix=
+
+      - name: Build and push
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          platforms: linux/amd64,linux/arm64
+
+  release:
+    needs: [security-gate, build-docker]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+
+      - name: Build production bundle
+        run: |
+          npm ci
+          npm run build
+          cd server && npm ci --production
+
+      - name: Create release archive
+        run: |
+          mkdir -p release
+          cp -r dist release/
+          cp -r server/src release/server/
+          cp server/package*.json release/server/
+          cp docker-compose.yml release/
+          cp install.sh release/
+          cp README.md release/
+          cp LICENSE release/
+          tar -czvf openclaw-sentinel-${{ github.ref_name }}.tar.gz -C release .
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v1
+        with:
+          files: openclaw-sentinel-${{ github.ref_name }}.tar.gz
+          generate_release_notes: true
+          body: |
+            ## 🦀 OpenClaw Sentinel ${{ github.ref_name }}
+
+            ### Docker
+            ```bash
+            docker pull ghcr.io/${{ github.repository }}:${{ github.ref_name }}
+            ```
+
+            ### Manual Install
+            ```bash
+            curl -fsSL https://github.com/${{ github.repository }}/releases/download/${{ github.ref_name }}/openclaw-sentinel-${{ github.ref_name }}.tar.gz | tar -xz
+            ./install.sh
+            ```
