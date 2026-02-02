@@ -1664,6 +1664,79 @@ app.get('/api/live/events', (req, res) => {
   })
 })
 
+// ============================================
+// Efficiency Metrics (Diagnostic Tools)
+// ============================================
+
+import { calculateEfficiencyMetrics } from './domain/services/EfficiencyCalculator.js'
+
+/**
+ * @openapi
+ * /api/efficiency:
+ *   get:
+ *     tags: [Efficiency]
+ *     summary: Get efficiency metrics (diagnostic tools)
+ *     description: |
+ *       Returns Cost/PR, Cost/Session, Cost/Commit alongside context metrics.
+ *       These are DIAGNOSTIC tools, not performance metrics.
+ *       Always interpret with Cache Ratio and Session Size for context.
+ *     parameters:
+ *       - name: agent
+ *         in: query
+ *         description: Filter by agent ID
+ *         schema:
+ *           type: string
+ *     responses:
+ *       200:
+ *         description: Efficiency metrics with diagnostics
+ */
+app.get('/api/efficiency', async (req, res) => {
+  try {
+    const agentFilter = req.query.agent || null
+    const { messages, toolCalls, agents } = await parseSessionFiles(agentFilter)
+    const usage = aggregateUsage(messages)
+
+    // Count unique sessions from file paths
+    const sessionFiles = await glob(sessionsPattern)
+    let sessionCount = sessionFiles.length
+    if (agentFilter) {
+      sessionCount = sessionFiles.filter(f => f.includes(`/agents/${agentFilter}/`)).length
+    }
+
+    // Count git-related tool calls (PRs, commits)
+    // PRs: exec with 'gh pr' or message about PR
+    const prToolCalls = toolCalls.filter(tc =>
+      (tc.name === 'exec' && tc.arguments?.command?.includes('gh pr create')) ||
+      (tc.name === 'exec' && tc.arguments?.command?.includes('gh pr merge'))
+    )
+
+    // Commits: exec with 'git commit' or 'git push'
+    const commitToolCalls = toolCalls.filter(tc =>
+      tc.name === 'exec' && (
+        tc.arguments?.command?.includes('git commit') ||
+        tc.arguments?.command?.includes('git push')
+      )
+    )
+
+    const activityCounts = {
+      prCount: prToolCalls.length,
+      commitCount: commitToolCalls.length,
+      sessionCount
+    }
+
+    const metrics = calculateEfficiencyMetrics(usage, activityCounts)
+
+    res.json({
+      ...metrics,
+      agent: agentFilter || 'all',
+      timestamp: new Date().toISOString(),
+      note: 'These are diagnostic tools, not performance metrics. Always interpret with context.'
+    })
+  } catch (err) {
+    res.status(500).json({ error: err.message })
+  }
+})
+
 // Start gateway connection
 gatewayClient.connect()
 

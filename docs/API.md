@@ -209,6 +209,62 @@ Query historical insights data.
 
 ---
 
+## Efficiency Metrics (Diagnostic Tools)
+
+### GET /api/efficiency
+Get cost efficiency metrics with diagnostic context.
+
+**Important:** These are DIAGNOSTIC tools, not performance metrics. Always interpret alongside Cache Ratio and Session Size.
+
+**Parameters:**
+| Param | Type | Default | Description |
+|-------|------|---------|-------------|
+| agent | string | (all) | Filter by agent ID |
+
+**Response:**
+```json
+{
+  "costPerPR": 5.23,
+  "costPerSession": 2.15,
+  "costPerCommit": 0.85,
+  "cacheHitRatio": 45,
+  "avgSessionSize": 24000,
+  "counts": {
+    "prs": 10,
+    "commits": 50,
+    "sessions": 25,
+    "totalCost": 52.30,
+    "totalTokens": 600000
+  },
+  "diagnostics": {
+    "status": "normal",
+    "diagnostics": [
+      {
+        "type": "complex_work",
+        "severity": "info",
+        "message": "High Cost/PR with normal cache and session metrics",
+        "suggestion": "Likely complex work - this is expected for difficult tasks"
+      }
+    ],
+    "context": {
+      "cacheRatioNote": "Good cache utilization",
+      "sessionSizeNote": "Normal session sizes"
+    }
+  },
+  "note": "These are diagnostic tools, not performance metrics. Always interpret with context."
+}
+```
+
+**Diagnostic Interpretations:**
+
+| Pattern | Diagnosis | Suggestion |
+|---------|-----------|------------|
+| High Cost/PR + Low Cache Ratio | Cache issue | Improve CLAUDE.md or project docs |
+| High Cost/PR + High Session Size | Session bloat | Start fresh more often |
+| High Cost/PR + Normal metrics | Complex work | Expected for difficult tasks |
+
+---
+
 ## Memory Stats
 
 ### GET /api/memory
